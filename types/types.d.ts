@@ -37,7 +37,11 @@ export type ItemV3 = {
   color_code: string | null;
   description: string | null;
   is_viewing: boolean;
-  highlight_video: string;
+  highlight_video: {
+    content_id: string;
+    dash_url: string;
+    hls_url: string;
+  };
   awards: string[]; // FIXME: any[]는 맞음
   notice: string;
   tags: string[];
