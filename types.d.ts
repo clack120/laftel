@@ -49,7 +49,7 @@ export type ItemV3 = {
   author: string[];
   illustrator: string[];
   expire_datetime: string;
-  series_id: int;
+  series_id: number;
   max_episode_rating: RatingV2;
   directors: {
     name: string;
@@ -74,23 +74,23 @@ export type EpisodesV2 = {
 //https://api.laftel.net/api/external_products/v1/naver/list/?item_id=애니ID&limit=12&offset=0
 export type ExternalProducts = {
   count: number;
-  next: string | null | any;
-  previous: string | null | any;
+  next: string | null; // string인지는 확실하지 않음
+  previous: string | null; // string인지는 확실하지 않음
   results: ExternalProduct[];
 };
 export type ExternalProduct = {
-  id: int;
+  id: number;
   product_type: "GOODS" | string;
   shop_type: "NAVER_STORE" | string;
   naver_external_product?: {
-    id: int; //  위에 id랑 같은듯
+    id: number; // 위에 id랑 같은듯
     name: string; //상품이름
-    sale_price: int;
-    discounted_price: int;
+    sale_price: number;
+    discounted_price: number;
     representative_image_url: string;
-    discount_rate: int;
+    discount_rate: number;
     purchase_page_url: string;
-    badges: any[];
+    badges: []; // FIXME: any[];
   };
 };
 
@@ -113,20 +113,18 @@ export type EpisodeV2 = {
   is_avod: boolean;
   is_free: boolean;
   is_viewing: boolean;
-  access_type: "avod" | string;
+  access_type: "avod" | "svod" | string;
   is_available: true;
-  products: any[];
+  products: []; // FIXME: any[];
   episode_products: EpisodeProductV2[];
   published_datetime: string;
   rating: RatingV2;
 };
 
 export type RatingV2 = {
-  /** 이용가 등급 (만 나이) */
-  rating: 19 | 15 | int;
-  /** 등급 분류 기관 (예: 방송통신심의위원회) */
-  rating_type: string;
-  classification_number: string; // idk
+  rating: 19 | 15 | 12 | number;
+  rating_type: "방송통신심의위원회" | string;
+  classification_number: string;
   broadcast_channel_name: string;
   broadcast_date: string;
   rating_components: string[]; // FIXME: 진짜 string[] 인지는 모르고 일단 any[]는 맞음
