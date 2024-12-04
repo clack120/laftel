@@ -8,6 +8,7 @@ const env = {
 
 const client = new LaftelClient(env.get("LAFTEL_TOKEN"));
 
+/* 나조차 보기 너무 드러운 코드
 let query = prompt("검색할 애니메이션:") || "null"; // bun 쓰면 작동 안함(유니코드; 근데 리눅스에서는 됨)
 
 let data = await client.searchAnime(
@@ -19,7 +20,6 @@ data.forEach((anime, index) => {
   console.log(index + 1, anime.name);
 });
 
-/* 나조차 보기 너무 드러운 코드
 let index: number | string = 'NaN';
 while (!(parseInt(index) && index >= 1 && index <= data.length))
   index = prompt("애니메이션 고르셈:");
