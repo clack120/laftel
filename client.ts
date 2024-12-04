@@ -1,5 +1,5 @@
 import type * as types from "./types";
-import { int, float } from "./types";
+import { int, float } from "./types/index.ts";
 
 export class LaftelClient {
   private headers: Record<string, string>;

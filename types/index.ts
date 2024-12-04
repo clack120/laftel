@@ -6,4 +6,4 @@ export function isInt(n: number): n is int {
 export function isFloat(n: number): n is float {
   return n !== Math.floor(n);
 }
-export * from "./types";
+export type * from "./types.d.ts";
