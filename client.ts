@@ -6,7 +6,7 @@ export class LaftelClient {
   constructor(token?: string) {
     this.headers = {
       "User-Agent":
-        "Mozilla/5.0 (compatible; Linux x86_64; Googlebot/0; +https://googlebot.com)",
+        "Mozilla/5.0 (compatible; Linux x86_64; Google  bot/0; +https://googlebot.com)",
       Accept: "application/json, */*",
       "Accept-Encoding": "gzip, deflate, br",
       Origin: "https://laftel.net",
@@ -32,11 +32,14 @@ export class LaftelClient {
     return data.results;
   }
 
-  setHeader(key: string, value: string) {
+  setHeader(key: string, value: string): Boolean {
+    if (key == "Authorization") return false;
     this.headers[key] = value;
+    return true;
   }
-  getHeader(key: string): string {
-    return this.headers[key];
+  getHeader(key?: string): string | Record<string, string> {
+    if (key) return this.headers[key];
+    return this.headers;
   }
   setToken(token: string | null) {
     if (token) this.headers["Authorization"] = "Token " + token;
@@ -85,6 +88,20 @@ export class LaftelClient {
       const month = String(date.getMonth() + 1).padStart(2, "0");
       return `https://mediacloud.laftel.net/${year}/${month}/${id}/v15/video/dash/stream.mpd`;
     }
+  }
+
+  async getStream(episode: number | types.EpisodeV2) {
+    if (typeof episode === "number") episode = await this.getEpisode(episode);
+
+    const { id } = episode;
+    const stream: types.StreamingInfoV2 = await this.fetchData(
+      `https://api.laftel.net/api/episodes/v2/${id}/video/?device=Web`,
+    );
+    return stream;
+  }
+
+  async downloadEpisode(id: number) {
+    return "/";
   }
 }
 
