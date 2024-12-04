@@ -1,0 +1,10 @@
+{
+  "lint": {
+    "rules": {
+      "tags": ["recommended"]
+    }
+  },
+  "tasks": {
+    "start": "deno run --allow-net=api.laftel.net --allow-env=LAFTEL_TOKEN index.ts"
+  }
+}
