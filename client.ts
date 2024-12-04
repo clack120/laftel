@@ -44,7 +44,7 @@ export class LaftelClient {
     const data = await res.json();
     return data["results"];
   }
-  async getEpisode(id: int): Promise<types.EpisodeV2> {
+  async getEpisode(id: number): Promise<types.EpisodeV2> {
     const res = await fetch(`https://api.laftel.net/api/episodes/v2/${id}/`, {
       headers: this.headers,
     });
