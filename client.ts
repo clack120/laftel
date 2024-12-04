@@ -2,7 +2,7 @@ import type * as types from "./types.d.ts";
 const BASE_URL = "https://api.laftel.net/api";
 
 export class LaftelClient {
-  private headers: Record<string, string>;
+  private headers: Record<string, string> = {};
   constructor(token?: string) {
     this.headers = {
       "User-Agent":
@@ -31,6 +31,18 @@ export class LaftelClient {
     const data = await res.json();
     return data.results;
   }
+
+  setHeader(key: string, value: string) {
+    this.headers[key] = value;
+  }
+  getHeader(key: string): string {
+    return this.headers[key];
+  }
+  setToken(token: string | null) {
+    if (token) this.headers["Authorization"] = "Token " + token;
+    else delete this.headers["Authorization"];
+  }
+
   async searchAnime(
     query: string,
     size = 24,

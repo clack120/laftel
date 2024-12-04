@@ -7,6 +7,7 @@ const env = {
 };
 
 const client = new LaftelClient(env.get("LAFTEL_TOKEN"));
+client.setToken(null);
 
 /* 나조차 보기 너무 드러운 코드
 let query = prompt("검색할 애니메이션:") || "null"; // bun 쓰면 작동 안함(유니코드; 근데 리눅스에서는 됨)
