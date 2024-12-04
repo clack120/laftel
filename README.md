@@ -1,11 +1,18 @@
+NOT WORKING YET
+## Requirements
+https://github.com/FoxRefire/wvg  
+https://docs.deno.com/runtime/#install-deno  
+https://github.com/aria2/aria2/releases/latest  
+https://github.com/yt-dlp/yt-dlp/releases/latest  
+https://github.com/BtbN/FFmpeg-Builds/releases/latest  
+https://www.bento4.com/downloads/#binary-releases-and-source-snapshot  
 
 
-목표(아직 안된다는뜻)  
-쾌적한 커스텀 라프텔 클라이언트?  
-안드로이드에서도 구동됨(서버 로칼로 열듯? termux로(안드7 이상 요구))  
-git 쓰는법 조금이라도 익히기  
 
 
 
 
-지적이고 뭐고 모르겠고 풀리퀘 존나환영 
+
+This program requires a laftel token, which is generated through your identity on laftel.
+and I'm not responsible for your account being banned or for any legal action taken by Laftel, other OTT platforms, or animation distributors.
+#### Pull requests are super welcome
