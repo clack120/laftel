@@ -6,8 +6,8 @@ export type ItemV3 = {
   /** 애니메이션 내용 줄거리 */
   content: string | null;
   /** 이용가 등급 (만 나이) */
-  rating: 19 | 15 | 12 | int;
-  rating_type: "방송통신심의위원회" | string;
+  rating: RatingV2["rating"];
+  rating_type: RatingV2["rating_type"];
   is_adult: boolean;
   /** 검열이 덜한 버전인지 */
   is_uncensored: boolean;
