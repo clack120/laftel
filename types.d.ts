@@ -9,6 +9,7 @@ export type ItemV3 = {
   is_adult: boolean;
   /** 검열이 덜한 버전인지 */
   is_uncensored: boolean;
+  /** 더빙한 버전인지 */
   is_dubbed: boolean;
   is_laftel_only: boolean;
   is_laftel_original: boolean;
@@ -16,6 +17,7 @@ export type ItemV3 = {
   /** 광고 무료인가[?] */
   is_avod: boolean;
   is_svod: boolean;
+  /** 신작[?] */
   is_new_release: boolean;
   is_upcoming_release: boolean;
   is_episode_existed: boolean;
@@ -25,8 +27,10 @@ export type ItemV3 = {
     img_url: string;
     crop_ratio: string;
   }[];
+  /** 장르 */
   genre: string[];
   release_weekdays: string[];
+  /** 마지막 발매 일시 */
   latest_episode_release_datetime: string;
   /** 평점 ( 0-5 ) */
   avg_rating: number;
@@ -71,7 +75,7 @@ export type EpisodesV2 = {
   results: EpisodeV2[];
 };
 
-//https://api.laftel.net/api/external_products/v1/naver/list/?item_id=애니ID&limit=12&offset=0
+//https://api.laftel.net/api/external_products/v1/naver/list/?item_id=${애니ID}&limit=12&offset=0
 export type ExternalProducts = {
   count: number;
   next: string | null; // string인지는 확실하지 않음
@@ -105,7 +109,7 @@ export type EpisodeV2 = {
   episode_order: number;
   thumbnail_path: string;
   has_preview: boolean;
-  access_info_list: [];
+  access_info_list: any[]; // FIXME: 확실하지 않음
   running_time: string; // 0:23:50.433000 같은
   progressbar: number | null;
   item_expire_datetime: string | null;
@@ -136,4 +140,55 @@ export type EpisodeProductV2 = {
   list_price: number;
   period: string;
   promotion: string | null;
+};
+
+// https://api.laftel.net/api/episodes/v2/${에피소드 ID}/video/?device=Web
+export type StreamingInfoV2 = {
+  code?: "PLAYBACK_DEACTIVATED" | string; // 동시 재생 등의 문제 발생 시
+  detail?:
+    | {
+        user_id: number;
+        profile_name: string;
+        item_name: string;
+        device_type: string;
+      }[]
+    | any;
+
+  is_cartoon_network?: boolean;
+  playback_info?: {
+    op_start: number | null;
+    op_end: number | null;
+    ed_start: number | null;
+    ed_end: number | null;
+    episode_id: EpisodeV2["id"];
+    episode_num: EpisodeV2["episode_num"];
+    action_time: number;
+    progressbar: EpisodeV2["progressbar"];
+  };
+  products_info?: {
+    point: number; // ? 아마도 지급 포인트
+    products: {
+      product_no: string;
+      name: string;
+      is_rental: boolean;
+      price: number;
+    }[];
+  };
+  protected_streaming_info?: {
+    content_id: string;
+    access_type: string;
+    widevine_token: string;
+    fairplay_token: string;
+    playready_token: string;
+    dash_url: string;
+    hls_url: string;
+    subtitle_url: null;
+  };
+  public_streaming_info?: {
+    dash_preview_url: string | null;
+    hls_preview_url: string | null;
+    thumbnail: string | null;
+    subtitle_preview_url: string | null;
+  };
+  play_log_id?: number;
 };
