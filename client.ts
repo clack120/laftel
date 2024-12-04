@@ -1,14 +1,22 @@
 import type * as types from "./types";
-import { int, float } from "./types/index.ts";
 
 export class LaftelClient {
   private headers: Record<string, string>;
   constructor(token?: string) {
     this.headers = {
       "User-Agent":
-        "Mozilla/5.0 (compatible; Googlebot/0; +https://googlebot.com)",
+        "Mozilla/5.0 (compatible; Linux x86_64; Googlebot/0; +https://googlebot.com)",
+      Accept: "application/json, */*",
+      "Accept-Encoding": "gzip, deflate, br",
+      Origin: "https://laftel.net",
+      Referer: "https://laftel.net",
       "Referrer-Policy": "no-referrer",
+      "Sec-GPG": "1",
       DNT: "1",
+      //"Sec-Fetch-Dest": "empty",
+      //"Sec-Fetch-Mode": "cors",
+      //"Sec-Fetch-Site": "same-site",
+      //TE: "trailers",
     };
     if (token)
       this.headers["Authorization"] = "Token " + token; // actually required to watch or download anime
