@@ -26,7 +26,6 @@ idx = parseInt(prompt("select anime:") || "0") - 1; // TODO: 예외처리
 const episode = res[idx];
 const downloadURL = await client.getMPDPath(episode);
 console.log(downloadURL);
-// https://mediacloud.laftel.net/2023/05/68373/v15/video/dash/stream.mpd
 const process = Deno.run({
   cmd: [
     "bin/yt-dlp",
