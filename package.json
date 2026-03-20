@@ -1,0 +1,22 @@
+{
+  "name": "@clack120/laftel-ts",
+  "version": "0.0.2-alpha.8063194",
+  "type": "module",
+  "main": "./src/mod.ts",
+  "exports": {
+    ".": "./src/mod.ts"
+  },
+  "scripts": {
+    "prepublishOnly": "./anyjs scripts/versionify.js; esbuild src/mod.ts --bundle --format=esm --platform=neutral --outfile=dist/mod.js",
+    "typeify": "./anyjs scripts/typeify.js",
+    "test:bun": "bun tests/client.test.ts",
+    "test:deno": "deno run --allow-net=api.laftel.net,mediacloud.laftel.net,thumbnail.laftel.net,license.pallycon.com,store-api.laftel.net,cdm-project.com,cdrm-project.com,127.0.2.1 tests/client.test.ts",
+    "test:tjs": "tjs examples/test.js",
+    "test:txikijs": "tjs examples/test.js",
+    "test:node": "node examples/test.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0",
+    "typescript": "^6.0.2"
+  }
+}
