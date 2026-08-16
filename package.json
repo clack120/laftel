@@ -1,0 +1,32 @@
+{
+  "name": "@clack120/laftel",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/mod.d.ts",
+      "default": "./dist/mod.js"
+    },
+    "./drm": {
+      "types": "./dist/drm.d.ts",
+      "default": "./dist/drm.js"
+    },
+    "./payments": {
+      "types": "./dist/payments.d.ts",
+      "default": "./dist/payments.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "check": "deno check src/mod.ts src/drm.ts src/payments.ts",
+    "gen:constants": "deno run --allow-net --allow-write=src scripts/gen-constants.ts"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  },
+  "license": "Unlicense"
+}
