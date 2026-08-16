@@ -1,0 +1,238 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>laftel SDK flow demo</title>
+<style>
+body { font: 14px sans-serif; margin: 0; background: #111; color: #eee; }
+header { display: flex; gap: 12px; align-items: center; padding: 12px 16px; background: #1a1a1a; position: sticky; top: 0; z-index: 10; }
+header b { color: #7c5cff; font-size: 18px; }
+input { padding: 8px; background: #222; border: 1px solid #333; color: #eee; border-radius: 6px; }
+#q { flex: 1; }
+section { padding: 8px 16px 20px; }
+h2 { font-size: 15px; color: #bbb; margin: 12px 0 8px; }
+.row { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.card { cursor: pointer; flex: 0 0 140px; }
+.card img { width: 140px; aspect-ratio: 2/3; object-fit: cover; border-radius: 8px; background: #222; }
+.card div { margin-top: 4px; font-size: 12px; line-height: 1.3; }
+ol { padding-left: 22px; margin: 0; }
+ol li { cursor: pointer; padding: 3px 0; }
+.tabs button { background: #222; margin-right: 6px; }
+.tabs button.on { background: #7c5cff; }
+button { background: #333; color: #fff; border: 0; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+.tag { display: inline-block; background: #2a2a3a; padding: 2px 8px; border-radius: 12px; margin: 2px; font-size: 12px; }
+.ac { position: absolute; background: #222; border: 1px solid #333; width: 380px; z-index: 20; }
+.ac div { padding: 6px 10px; cursor: pointer; }
+.ac div:hover { background: #333; }
+#detail { position: fixed; inset: 0; background: rgba(0,0,0,.94); overflow: auto; padding: 24px; display: none; }
+#detail.open { display: block; }
+#detail img.poster { max-width: 200px; border-radius: 8px; float: left; margin: 0 16px 16px 0; }
+.live b { color: #ff5c5c; }
+</style>
+
+<header>
+  <b>라프텔</b>
+  <div style="position:relative;flex:1">
+    <input id="q" placeholder="제목(초성), 제작사, 감독으로 검색" autocomplete="off" />
+    <div id="ac" class="ac" hidden></div>
+  </div>
+  <input id="tok" placeholder="토큰 (이어보기)" size="20" />
+</header>
+
+<div id="home"></div>
+<div id="detail"></div>
+
+<script type="module">
+import { Item, Laftel } from "/dist/mod.js";
+
+const route = (url) => {
+  const u = new URL(url, location.href);
+  return u.hostname.endsWith("laftel.net") ? `/proxy/${u.hostname}${u.pathname}${u.search}` : String(url);
+};
+const laftel = new Laftel({ fetch: (url, opts) => fetch(route(url), opts) });
+
+const home = document.getElementById("home");
+const cardEl = (it) => {
+  const d = document.createElement("div");
+  d.className = "card";
+  d.innerHTML = `<img src="${it.thumbnail ?? ""}" loading="lazy"><div>${it.name ?? ""}</div>`;
+  d.onclick = () => openDetail(it.id);
+  return d;
+};
+const section = (title) => {
+  const s = document.createElement("section");
+  s.innerHTML = `<h2>${title}</h2>`;
+  home.append(s);
+  return s;
+};
+const rowOf = (s, items) => {
+  const r = document.createElement("div");
+  r.className = "row";
+  for (const it of items) r.append(cardEl(it instanceof Item ? it : new Item(it)));
+  s.append(r);
+};
+
+async function openDetail(id) {
+  const box = document.getElementById("detail");
+  box.className = "open";
+  box.innerHTML = "불러오는 중…";
+  const [item, eps] = await Promise.all([laftel.items.get(id), laftel.episodes.list(id, { limit: 300 })]);
+  box.innerHTML = `
+    <button onclick="document.getElementById('detail').className=''">✕ 닫기</button>
+    <h1>${item.name ?? ""}</h1>
+    <img class="poster" src="${item.thumbnail ?? ""}">
+    <p>${item.format ?? ""} / ${item.airPeriod ?? ""} / ★${item.score ?? "-"} / ${item.ageRating ?? ""}세 ${
+    item.completed ? "/ 완결" : ""
+  }</p>
+    <p>${(item.genres ?? []).map((g) => `<span class="tag">${g}</span>`).join("")}</p>
+    <p>감독: ${item.directors.join(", ") || "-"} / 제작: ${item.studios.join(", ") || "-"}</p>
+    <p>${item.description ?? ""}</p>
+    <h2>에피소드 ${eps.count ?? eps.results.length}개</h2>
+    <ol>${
+    eps.results.map((e) => `<li data-ep="${e.id}">${e.episodeLabel}화 ${e.title ?? ""} ${e.free ? "(무료)" : ""}</li>`)
+      .join(
+        "",
+      )
+  }</ol>
+    <pre id="stream"></pre>`;
+  box.querySelectorAll("li[data-ep]").forEach((li) =>
+    li.onclick = async () => {
+      const out = document.getElementById("stream");
+      out.textContent = "스트림 정보…";
+      try {
+        const s = await laftel.episodes.video(+li.dataset.ep);
+        out.textContent = JSON.stringify(
+          {
+            dash: s.dash,
+            drm: s.drm?.system ?? null,
+            token: s.drm?.token ?? null,
+            contentId: s.drm?.contentId,
+            opening: s.opening,
+            ending: s.ending,
+          },
+          null,
+          2,
+        );
+      } catch (e) {
+        out.textContent = "재생 정보 실패(권한/로그인 필요): " + e.message;
+      }
+    }
+  );
+}
+
+// --- 홈 조립 ---
+
+// 이어보기 (토큰 있으면)
+const cwSection = section("이어보기 (토큰 필요)");
+async function loadContinue() {
+  if (!laftel.token) return;
+  try {
+    const acc = await laftel.profiles.account();
+    const cw = await laftel.users.continueWatching(acc.id, { limit: 20 });
+    cwSection.querySelector("h2").textContent = "이어보기";
+    rowOf(cwSection, cw.results.map((e) => e.item));
+  } catch (e) {
+    cwSection.querySelector("h2").textContent = "이어보기 (실패: " + e.message + ")";
+  }
+}
+document.getElementById("tok").onchange = (e) => {
+  laftel.token = e.target.value.trim() || null;
+  loadContinue();
+};
+
+// 지금 실시간 방송중!
+const liveS = section("지금 실시간 방송중!");
+for (const c of await laftel.live.channels()) {
+  const p = document.createElement("p");
+  p.className = "live";
+  p.innerHTML = `<b>● ${c.displayName}</b> / ${c.current?.title ?? ""} <small>${
+    c.current?.startsAt?.toLocaleTimeString("ko-KR") ?? ""
+  }</small> <code>${c.dash ?? ""}</code>`;
+  liveS.append(p);
+}
+
+// 라프텔 TOP 20 (탭)
+const topS = section("라프텔 TOP 20");
+const tabs = document.createElement("div");
+tabs.className = "tabs";
+const list = document.createElement("ol");
+topS.append(tabs, list);
+const windows = [["실시간", "4hour"], ["주간", "week"], ["분기", "quarter"], ["역대", "history"]];
+async function loadTop(win, btn) {
+  tabs.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b === btn));
+  const items = await laftel.home.ranking(win);
+  list.innerHTML = items.slice(0, 20).map((it) => `<li data-id="${it.id}">${it.name ?? ""}</li>`).join("");
+  list.querySelectorAll("li").forEach((li) => li.onclick = () => openDetail(+li.dataset.id));
+}
+windows.forEach(([label, win], i) => {
+  const b = document.createElement("button");
+  b.textContent = label;
+  b.onclick = () => loadTop(win, b);
+  tabs.append(b);
+  if (i === 0) loadTop(win, b);
+});
+
+// 요일별 신작 (daily)
+rowOf(section("요일별 신작"), await laftel.search.dailyNewReleases());
+
+// 파노라마 (예: "카마도 탄지로!")
+const pano = await laftel.home.panorama();
+if (pano?.items?.length) {
+  const s = section(pano.name);
+  const r = document.createElement("div");
+  r.className = "row";
+  for (const it of pano.items) {
+    const d = document.createElement("div");
+    d.className = "card";
+    d.innerHTML = `<img src="${it.image}" loading="lazy">`;
+    d.onclick = () => openDetail(it.itemId);
+    r.append(d);
+  }
+  s.append(r);
+}
+
+// 컬렉션 (다른 익숙한 말로 "피드")
+const cols = await laftel.home.itemCollections({ limit: 6 });
+for (const col of cols.results) rowOf(section(col.name), col.items);
+
+// 진행 중인 이벤트 (더보기 -> /events)
+const evS = section("진행 중인 이벤트 (더보기 /events)");
+const events = await laftel.events.list({ limit: 8 });
+for (const ev of events.results) {
+  const p = document.createElement("p");
+  p.textContent = `• ${ev.name ?? ""}`;
+  evS.append(p);
+}
+
+// 둘러보기 그리드 (discover)
+const discS = section("둘러보기 API (태그: 액션)");
+const g = document.createElement("div");
+g.className = "grid";
+discS.append(g);
+for (const it of (await laftel.search.discover({ genres: { include: ["액션"] }, limit: 24 })).results) {
+  g.append(cardEl(it));
+}
+
+// 검색 자동완성
+let t;
+document.getElementById("q").oninput = (e) => {
+  clearTimeout(t);
+  const kw = e.target.value.trim();
+  const ac = document.getElementById("ac");
+  if (!kw) return (ac.hidden = true);
+  t = setTimeout(async () => {
+    const sug = await laftel.search.autocomplete(kw);
+    ac.hidden = false;
+    ac.innerHTML = sug.slice(0, 10).map((s) => `<div>${s}</div>`).join("");
+    ac.querySelectorAll("div").forEach((d) =>
+      d.onclick = async () => {
+        ac.hidden = true;
+        document.getElementById("q").value = d.textContent;
+        const r = await laftel.search.keyword(d.textContent);
+        g.innerHTML = "";
+        discS.querySelector("h2").textContent = `검색: ${d.textContent}`;
+        for (const it of r.results) g.append(cardEl(it));
+      }
+    );
+  }, 200);
+};
+</script>
