@@ -27,6 +27,15 @@ export const STORE_BASE = "https://store-api.laftel.net/";
 
 export interface LaftelConfig {
   token?: string | null;
+  /**
+   * Where the API lives. Defaults to laftel's own.
+   *
+   * A mirror that serves the same shapes can be pointed at instead. Paths are
+   * appended as-is, so this needs its trailing slash.
+   */
+  baseUrl?: string;
+  /** Where the store API lives. Defaults to laftel's own. */
+  storeBaseUrl?: string;
   fetch?: typeof fetch;
   userAgent?: string;
   headers?: Record<string, string>;
@@ -93,8 +102,8 @@ export class Laftel {
       headers: config.headers,
       debug: config.debug,
     };
-    this.api = new Http({ baseUrl: API_BASE, ...shared });
-    this.storeHttp = new Http({ baseUrl: STORE_BASE, ...shared });
+    this.api = new Http({ baseUrl: config.baseUrl ?? API_BASE, ...shared });
+    this.storeHttp = new Http({ baseUrl: config.storeBaseUrl ?? STORE_BASE, ...shared });
 
     this.items = new Items(this.api);
     this.episodes = new Episodes(this.api);
