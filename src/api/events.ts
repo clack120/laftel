@@ -38,7 +38,7 @@ export interface EventDraw {
   condition: string;
   minProfileLevel: number | null;
   requiresThirdPartyConsent: boolean;
-  thirdPartyCompany: string;
+  thirdPartyCompany: string | null;
   requiresAddress: boolean;
 }
 
@@ -173,9 +173,7 @@ export class Events {
     return this.http.get(`events/v1/${id}/votes/${voteEventId}/result/`, { anon: true });
   }
 
-  /*
   castVote(id: number, voteEventId: number, choice: Record<string, unknown> = {}): Promise<unknown> {
     return this.http.post(`events/v1/${id}/votes/${voteEventId}/`, { body: choice });
   }
-  */
 }

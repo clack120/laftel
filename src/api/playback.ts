@@ -1,5 +1,6 @@
 import type { Http } from "../http.ts";
 import { hms } from "../normalize.ts";
+import type { LiteralUnion } from "../types.ts";
 
 export interface Heartbeat {
   /** 누적 시청 시간(초) */
@@ -36,11 +37,26 @@ export class Playback {
     });
   }
 
-  clearRecent(type = "recent"): Promise<void> {
-    return this.http.del("play_logs/delete/", { query: { type } });
+  stop(
+    playLogId: number,
+    beat: Pick<Heartbeat, "playedSeconds" | "positionSeconds"> & { partnerToken?: string } = {},
+  ): Promise<void> {
+    return this.http.post(`play_logs/${playLogId}/stop/`, {
+      headers: { "Content-Type": "text/plain" }, // server rejects application/json
+      body: {
+        auth_token: (this.http.session.token ?? "").replace(/^\s*Token\s+/i, "").trim(),
+        partner_token: beat.partnerToken,
+        total_play_time: hms(beat.playedSeconds ?? 0),
+        play_end_offset: hms(beat.positionSeconds ?? 0),
+      },
+    });
   }
 
-  session(uuid: string, status: "playing" | "paused" | "stopped" | (string & {})): Promise<void> {
+  clearRecent(type = "recent", itemIds?: number[]): Promise<void> {
+    return this.http.del("play_logs/delete/", { query: { type }, body: itemIds ? { item_ids: itemIds } : undefined });
+  }
+
+  session(uuid: string, status: LiteralUnion<"playing" | "paused" | "stopped">): Promise<void> {
     return this.http.post(`playbacks/v1/sessions/${uuid}/`, { body: { status } });
   }
 

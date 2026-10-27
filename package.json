@@ -1,6 +1,6 @@
 {
   "name": "@clack120/laftel",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "exports": {
     ".": {
@@ -21,12 +21,15 @@
   ],
   "sideEffects": false,
   "scripts": {
-    "build": "tsc",
+    "build": "node scripts/build-package.mjs npm",
+    "build:jsr": "node scripts/build-package.mjs jsr",
+    "publish:jsr": "npm run build:jsr && cd build/jsr && deno publish --allow-dirty",
     "check": "deno check src/mod.ts src/drm.ts src/payments.ts",
     "gen:constants": "deno run --allow-net --allow-write=src scripts/gen-constants.ts"
   },
   "devDependencies": {
-    "typescript": "^6.0.3"
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2"
   },
   "license": "Unlicense"
 }

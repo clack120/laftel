@@ -1,6 +1,6 @@
 {
   "name": "@clack120/laftel",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "exports": {
     ".": "./src/mod.ts",
     "./drm": "./src/drm.ts",
@@ -12,7 +12,7 @@
   "tasks": {
     "check": "deno check src/mod.ts src/drm.ts src/payments.ts",
     "smoke": "deno run --allow-net example/smoke.ts",
-    "web": "deno run --allow-net=0.0.0.0:8791,api.laftel.net,store-api.laftel.net,mediacloud.laftel.net,thumbnail.laftel.net,license.pallycon.com --allow-read=example,dist example/proxy.ts",
+    "web": "deno run --allow-net=127.0.0.1:8791,api.laftel.net,store-api.laftel.net,mediacloud.laftel.net,thumbnail.laftel.net,license.pallycon.com --allow-read=example,dist example/proxy.ts",
     "gen:constants": "deno run --allow-net --allow-write=src scripts/gen-constants.ts"
   },
   "fmt": {

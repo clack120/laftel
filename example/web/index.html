@@ -23,7 +23,7 @@ button { background: #333; color: #fff; border: 0; padding: 6px 12px; border-rad
 .ac { position: absolute; background: #222; border: 1px solid #333; width: 380px; z-index: 20; }
 .ac div { padding: 6px 10px; cursor: pointer; }
 .ac div:hover { background: #333; }
-#detail { position: fixed; inset: 0; background: rgba(0,0,0,.94); overflow: auto; padding: 24px; display: none; }
+#detail { position: fixed; inset: 0; z-index: 30; background: rgba(0,0,0,.94); overflow: auto; padding: 24px; display: none; }
 #detail.open { display: block; }
 #detail img.poster { max-width: 200px; border-radius: 8px; float: left; margin: 0 16px 16px 0; }
 .live b { color: #ff5c5c; }
@@ -46,21 +46,23 @@ import { Item, Laftel } from "/dist/mod.js";
 
 const route = (url) => {
   const u = new URL(url, location.href);
-  return u.hostname.endsWith("laftel.net") ? `/proxy/${u.hostname}${u.pathname}${u.search}` : String(url);
+  return (u.hostname === "laftel.net" || u.hostname.endsWith(".laftel.net")) ? `/proxy/${u.hostname}${u.pathname}${u.search}` : String(url);
 };
 const laftel = new Laftel({ fetch: (url, opts) => fetch(route(url), opts) });
 
 const home = document.getElementById("home");
+const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const cardEl = (it) => {
   const d = document.createElement("div");
   d.className = "card";
-  d.innerHTML = `<img src="${it.thumbnail ?? ""}" loading="lazy"><div>${it.name ?? ""}</div>`;
+  d.innerHTML = `<img src="${esc(it.thumbnail)}" loading="lazy"><div>${esc(it.name)}</div>`;
   d.onclick = () => openDetail(it.id);
   return d;
 };
 const section = (title) => {
   const s = document.createElement("section");
-  s.innerHTML = `<h2>${title}</h2>`;
+  s.innerHTML = `<h2>${esc(title)}</h2>`;
   home.append(s);
   return s;
 };
@@ -78,17 +80,17 @@ async function openDetail(id) {
   const [item, eps] = await Promise.all([laftel.items.get(id), laftel.episodes.list(id, { limit: 300 })]);
   box.innerHTML = `
     <button onclick="document.getElementById('detail').className=''">✕ 닫기</button>
-    <h1>${item.name ?? ""}</h1>
-    <img class="poster" src="${item.thumbnail ?? ""}">
-    <p>${item.format ?? ""} / ${item.airPeriod ?? ""} / ★${item.score ?? "-"} / ${item.ageRating ?? ""}세 ${
+    <h1>${esc(item.name)}</h1>
+    <img class="poster" src="${esc(item.thumbnail)}">
+    <p>${esc(item.format)} / ${esc(item.airPeriod)} / ★${esc(item.score ?? "-")} / ${esc(item.ageRating)}세 ${
     item.completed ? "/ 완결" : ""
   }</p>
-    <p>${(item.genres ?? []).map((g) => `<span class="tag">${g}</span>`).join("")}</p>
-    <p>감독: ${item.directors.join(", ") || "-"} / 제작: ${item.studios.join(", ") || "-"}</p>
-    <p>${item.description ?? ""}</p>
-    <h2>에피소드 ${eps.count ?? eps.results.length}개</h2>
+    <p>${(item.genres ?? []).map((g) => `<span class="tag">${esc(g)}</span>`).join("")}</p>
+    <p>감독: ${esc(item.directors.join(", ") || "-")} / 제작: ${esc(item.studios.join(", ") || "-")}</p>
+    <p>${esc(item.description)}</p>
+    <h2>에피소드 ${esc(eps.count ?? eps.results.length)}개</h2>
     <ol>${
-    eps.results.map((e) => `<li data-ep="${e.id}">${e.episodeLabel}화 ${e.title ?? ""} ${e.free ? "(무료)" : ""}</li>`)
+    eps.results.map((e) => `<li data-ep="${esc(e.id)}">${esc(e.episodeLabel)}화 ${esc(e.title)} ${e.free ? "(무료)" : ""}</li>`)
       .join(
         "",
       )
@@ -124,13 +126,20 @@ async function openDetail(id) {
 // 이어보기 (토큰 있으면)
 const cwSection = section("이어보기 (토큰 필요)");
 async function loadContinue() {
-  if (!laftel.token) return;
+  const token = laftel.token;
+  cwSection.querySelector(".row")?.remove();
+  if (!token) {
+    cwSection.querySelector("h2").textContent = "이어보기 (토큰 필요)";
+    return;
+  }
   try {
     const acc = await laftel.profiles.account();
     const cw = await laftel.users.continueWatching(acc.id, { limit: 20 });
+    if (token !== laftel.token) return;
     cwSection.querySelector("h2").textContent = "이어보기";
     rowOf(cwSection, cw.results.map((e) => e.item));
   } catch (e) {
+    if (token !== laftel.token) return;
     cwSection.querySelector("h2").textContent = "이어보기 (실패: " + e.message + ")";
   }
 }
@@ -144,9 +153,9 @@ const liveS = section("지금 실시간 방송중!");
 for (const c of await laftel.live.channels()) {
   const p = document.createElement("p");
   p.className = "live";
-  p.innerHTML = `<b>● ${c.displayName}</b> / ${c.current?.title ?? ""} <small>${
+  p.innerHTML = `<b>● ${esc(c.displayName)}</b> / ${esc(c.current?.title)} <small>${
     c.current?.startsAt?.toLocaleTimeString("ko-KR") ?? ""
-  }</small> <code>${c.dash ?? ""}</code>`;
+  }</small> <code>${esc(c.dash)}</code>`;
   liveS.append(p);
 }
 
@@ -160,7 +169,8 @@ const windows = [["실시간", "4hour"], ["주간", "week"], ["분기", "quarter
 async function loadTop(win, btn) {
   tabs.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b === btn));
   const items = await laftel.home.ranking(win);
-  list.innerHTML = items.slice(0, 20).map((it) => `<li data-id="${it.id}">${it.name ?? ""}</li>`).join("");
+  if (!btn.classList.contains("on")) return;
+  list.innerHTML = items.slice(0, 20).map((it) => `<li data-id="${esc(it.id)}">${esc(it.name)}</li>`).join("");
   list.querySelectorAll("li").forEach((li) => li.onclick = () => openDetail(+li.dataset.id));
 }
 windows.forEach(([label, win], i) => {
@@ -183,7 +193,7 @@ if (pano?.items?.length) {
   for (const it of pano.items) {
     const d = document.createElement("div");
     d.className = "card";
-    d.innerHTML = `<img src="${it.image}" loading="lazy">`;
+    d.innerHTML = `<img src="${esc(it.image)}" loading="lazy">`;
     d.onclick = () => openDetail(it.itemId);
     r.append(d);
   }
@@ -221,8 +231,9 @@ document.getElementById("q").oninput = (e) => {
   if (!kw) return (ac.hidden = true);
   t = setTimeout(async () => {
     const sug = await laftel.search.autocomplete(kw);
+    if (document.getElementById("q").value.trim() !== kw) return;
     ac.hidden = false;
-    ac.innerHTML = sug.slice(0, 10).map((s) => `<div>${s}</div>`).join("");
+    ac.innerHTML = sug.slice(0, 10).map((s) => `<div>${esc(s)}</div>`).join("");
     ac.querySelectorAll("div").forEach((d) =>
       d.onclick = async () => {
         ac.hidden = true;
