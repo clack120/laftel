@@ -26,6 +26,7 @@ export interface DiscoverOptions {
   viewable?: boolean;
   offset?: number;
   limit?: number;
+  signal?: AbortSignal;
 }
 
 export class Search {
@@ -48,27 +49,36 @@ export class Search {
         size: opts.limit,
       },
       anon: true,
+      signal: opts.signal,
     });
     return mapPage(page, (r) => new Item(r));
   }
 
-  autocomplete(keyword: string): Promise<string[]> {
-    return this.http.get<string[]>("search/v1/auto_complete/", { query: { keyword }, anon: true });
+  autocomplete(keyword: string, opts: { signal?: AbortSignal } = {}): Promise<string[]> {
+    return this.http.get<string[]>("search/v1/auto_complete/", {
+      query: { keyword },
+      anon: true,
+      signal: opts.signal,
+    });
   }
 
   async keyword(
     keyword: string,
-    opts: { viewable?: boolean; offset?: number } = {},
+    opts: { viewable?: boolean; offset?: number; limit?: number; signal?: AbortSignal } = {},
   ): Promise<Paginated<Item>> {
     const page = await this.http.get<Paginated<RawItemCard>>("search/v3/keyword/", {
-      query: { keyword, viewing_only: opts.viewable, offset: opts.offset },
+      query: { keyword, viewing_only: opts.viewable, offset: opts.offset, size: opts.limit },
       anon: true,
+      signal: opts.signal,
     });
     return mapPage(page, (r) => new Item(r));
   }
 
-  async dailyNewReleases(): Promise<Item[]> {
-    const list = await this.http.get<RawItemCard[]>("search/v2/daily/", { anon: true });
+  async dailyNewReleases(opts: { signal?: AbortSignal } = {}): Promise<Item[]> {
+    const list = await this.http.get<RawItemCard[]>("search/v2/daily/", {
+      anon: true,
+      signal: opts.signal,
+    });
     return list.map((r) => new Item(r));
   }
 }

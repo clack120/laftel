@@ -1,14 +1,13 @@
 import { Laftel } from "../src/mod.ts";
-import { fromStream, getLicenseInfo } from "../src/drm.ts";
+import { fromStream } from "../src/drm.ts";
 
 const client = new Laftel();
 
 // 설정 예:
 // const client = new Laftel({
-//   token: "your-token",          // 로그인 대신 토큰 직접
-//   userAgent: "custom UA",       // 기본 = Googlebot UA (해외IP 우회)
-//   headers: { "X-Foo": "bar" },  // 모든 요청에 머지
-//   debug: true,                  // 요청/응답/헤더/바디 전부 stderr로 (토큰도 안 가림)
+//   token: "your-token",
+//   userAgent: "custom UA",
+//   debug: true, // 요청과 응답 원문을 출력하므로 토큰도 포함됨
 // });
 
 // Deno:

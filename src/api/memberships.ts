@@ -30,7 +30,7 @@ export interface ScheduledMembership {
   billingInfo?: BillingInfo | null;
 }
 
-const toProduct = (r: RawMembershipProduct): MembershipProduct => ({
+export const toMembershipProduct = (r: RawMembershipProduct): MembershipProduct => ({
   id: r.id,
   name: r.name,
   type: r.membership_type,
@@ -40,26 +40,29 @@ const toProduct = (r: RawMembershipProduct): MembershipProduct => ({
   autoRenewable: r.is_active_renewable,
 });
 
+export const toMembership = (r: RawMembership): Membership => ({
+  product: r.product ? toMembershipProduct(r.product) : undefined,
+  expiresAt: kst(r.expire_datetime),
+  maxProfiles: r.max_profile_count,
+  upgradeType: r.upgrade_type,
+  purchaseToken: r.purchase_token,
+});
+
 export class Memberships {
   constructor(private http: Http) {}
 
-  async current(): Promise<Membership> {
-    const r = await this.http.get<RawMembership>("memberships/v1/current/");
-    return {
-      product: r.product ? toProduct(r.product) : undefined,
-      expiresAt: kst(r.expire_datetime),
-      maxProfiles: r.max_profile_count,
-      upgradeType: r.upgrade_type,
-      purchaseToken: r.purchase_token,
-    };
+  async current(): Promise<Membership | null> {
+    const r = await this.http.get<RawMembership | null>("memberships/v1/current/");
+    return r ? toMembership(r) : null;
   }
 
-  async scheduled(): Promise<ScheduledMembership> {
-    const r = await this.http.get<RawReservedMembership>("memberships/v1/reserved/");
+  async scheduled(): Promise<ScheduledMembership | null> {
+    const r = await this.http.get<RawReservedMembership | null>("memberships/v1/reserved/");
+    if (!r) return null;
     return {
       status: r.status,
       nextPaymentAt: kst(r.next_payment_date),
-      product: r.product ? toProduct(r.product) : undefined,
+      product: r.product ? toMembershipProduct(r.product) : undefined,
       billingInfo: r.billing_info ? toBillingInfo(r.billing_info) : null,
     };
   }
@@ -74,6 +77,24 @@ export class Memberships {
     const res = await this.http.get<{ products: RawMembershipProduct[] }>("products/v3/membership_products/", {
       anon: true,
     });
-    return res.products.map(toProduct);
+    return res.products.map(toMembershipProduct);
+  }
+
+  cancellationSurvey(reason: string): Promise<void> {
+    return this.http.post("subscriptions/v1/survey/", { body: { reason } });
+  }
+
+  cancellationSurveyV2(input: { reasonId: number; subReasonId?: number; detailText?: string }): Promise<void> {
+    return this.http.post("subscriptions/v2/survey/", {
+      body: {
+        reason_id: input.reasonId,
+        sub_reason_id: input.subReasonId,
+        detail_text: input.detailText,
+      },
+    });
+  }
+
+  notifySamsungTvPurchase(): Promise<void> {
+    return this.http.post("affiliated_services/samsungtv/membership/");
   }
 }

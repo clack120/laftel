@@ -9,11 +9,11 @@ export type ContentRatingLabel = LiteralUnion<
 export type AgeRating = LiteralUnion<0 | 7 | 12 | 15 | 19, number>;
 
 /**
- * 시청 권한 유형. free=무료, svod=구독, avod=광고형.
+ * 시청 권한 유형. free=무료, svod=구독, avod=광고형, buy=소장, rent=대여.
  * null은 구매전용(TVOD 대여/소장)이거나 판권 만료.
  * episode_products로 구매 가능 여부 판별 가능.
  */
-export type AccessType = LiteralUnion<"free" | "svod" | "avod"> | null;
+export type AccessType = LiteralUnion<"free" | "svod" | "avod" | "buy" | "rent"> | null;
 
 export interface RawImage {
   option_name?: LiteralUnion<"home_default" | "home_custom">;
@@ -106,15 +106,25 @@ export interface RawItemCard {
   cropped_img?: string;
   home_img?: string;
   home_cropped_img?: string;
-  images?: RawImage[];
+  images?: RawImage[] | null;
   content_rating?: ContentRatingLabel | number;
-  rating?: number;
-  rating_type?: RatingType;
+  rating?: number | RawRating;
+  rating_type?: RatingType | null;
   genres?: Genre[];
+  tag?: { name: string; type?: string }[];
+  animation_info?: {
+    medium?: Medium;
+    air_year_quarter?: string | null;
+    production?: { name: string } | null;
+    is_dubbed?: boolean;
+    is_uncensored?: boolean;
+    is_laftel_only?: boolean;
+    is_laftel_original?: boolean;
+  };
   medium?: Medium;
   highlight_video?: RawHighlightVideo | null;
   average_score?: number;
-  distributed_air_time?: string;
+  distributed_air_time?: string | null;
   latest_episode_created?: string | null;
   latest_published_datetime?: string | null;
   is_adult?: boolean;
@@ -228,18 +238,19 @@ export interface RawStreamInfo {
 
 export interface RawComment {
   id: number;
-  parent_comment_id: number | null;
+  parent_comment_id?: number | null;
   profile: RawProfileBrief;
   content: string;
   item?: { id?: number; name?: string; medium?: Medium; rating?: number };
   episode?: { id?: number; subject?: string | null; episode_num?: string; thumbnail_path?: string | null };
-  shorts?: unknown | null;
+  shorts?: { id?: number; title?: string; thumbnail_path?: string | null } | null;
   created: string;
   modified: string;
   count_like: number;
-  count_reply_comment: number;
+  count_reply_comment?: number;
   is_click_like: boolean;
   is_spoiler: boolean;
+  replies?: RawComment[];
 }
 
 export interface RawReview {
@@ -247,7 +258,7 @@ export interface RawReview {
   profile?: RawProfileBrief;
   content: string;
   score: number;
-  item?: number | null;
+  item?: number | RawItemCard | null;
   created: string | null;
   modified: string | null;
   count_like: number;
@@ -301,7 +312,10 @@ export interface RawContinueWatching {
   play_next: boolean;
   progress: number;
   item: RawItemCard & { uid?: string; content?: string };
-  episode?: RawEpisode;
+  episode?: Pick<
+    RawEpisode,
+    "id" | "subject" | "episode_num" | "episode_order" | "thumbnail_path" | "published_datetime"
+  >;
 }
 
 export interface RawAuth {
@@ -493,14 +507,15 @@ export interface RawEventDraw {
   condition: string;
   min_profile_level: number | null;
   requires_third_party_consent: boolean;
-  third_party_company_name: string;
+  third_party_company_name: string | null;
   requires_address: boolean;
 }
 
 export interface RawStoreClassification {
   id: number;
   name: string;
-  logo_image_url: string;
+  logo_image_url?: string;
+  thumbnail_url?: string;
 }
 
 export interface RawHomeCollection {
@@ -508,6 +523,6 @@ export interface RawHomeCollection {
   name: string;
   collection_type: string;
   layout_type: string;
-  more_link_url: string;
+  more_link_url: string | null;
   image: { title: string; description: string; image_url: string; image_link_url: string } | null;
 }

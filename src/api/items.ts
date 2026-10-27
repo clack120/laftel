@@ -30,6 +30,10 @@ export type FinishedSort = LiteralUnion<"rank" | "view">;
 /** add=담은순, rank=인기순, recent=최신순 */
 export type WishSort = LiteralUnion<"add" | "rank" | "recent">;
 
+export interface WishedItem extends Item {
+  readonly wishId: number;
+}
+
 export interface Purchasability {
   purchasable?: boolean;
   purchaseType?: PurchaseType;
@@ -54,6 +58,7 @@ export interface ItemUserState {
 
 export interface ItemRequest {
   id: number;
+  active: boolean;
   itemId: number;
   userId: number;
   createdAt: Date | null;
@@ -62,6 +67,7 @@ export interface ItemRequest {
 
 const toItemRequest = (r: RawItemRequest): ItemRequest => ({
   id: r.id,
+  active: r.status,
   itemId: r.item,
   userId: r.user,
   createdAt: kst(r.created),
@@ -73,6 +79,10 @@ export class Items {
 
   async get(id: number): Promise<Item> {
     return new Item(await this.http.get<RawItem>(`items/v4/${id}/`, { anon: true }));
+  }
+
+  async getV2(id: number): Promise<Item> {
+    return new Item(await this.http.get<RawItemCard>(`items/v2/${id}/`, { anon: true }));
   }
 
   async statistics(id: number): Promise<ItemStatistics> {
@@ -137,22 +147,25 @@ export class Items {
     return { continueEpisodeId: r.continue_episode_id, wished: r.is_wish, hated: r.is_hate };
   }
 
-  // 각 결과는 위시 항목 래퍼(작품 카드는 .item에 중첩). 카드만 꺼내 반환.
-  async wishItems(opts: { sort?: WishSort; offset?: number } = {}): Promise<Paginated<Item>> {
-    const page = await this.http.get<Paginated<{ item: RawItemCard }>>("items/v1/wish_item/", {
+  async wishItems(opts: { sort?: WishSort; offset?: number } = {}): Promise<Paginated<WishedItem>> {
+    const page = await this.http.get<Paginated<{ id: number; item: RawItemCard }>>("items/v1/wish_item/", {
       query: { sorting: opts.sort, offset: opts.offset },
     });
-    return mapPage(page, (r) => new Item(r.item));
+    return mapPage(page, (r) => Object.assign(new Item(r.item), { wishId: r.id }));
   }
 
-  deleteWishItems(ids: number[]): Promise<void> {
-    return this.http.post("items/v1/wish_items/delete/", { body: { ids } });
+  deleteWishItems(wishIds: number[]): Promise<void> {
+    return this.http.post("items/v1/wish_items/delete/", { body: { ids: wishIds } });
   }
 
   /** 플레이어 페이지의 "이어보기" 레일: 진행 중인 다른 작품들(작품+마지막 시청 화). */
   async otherContinueWatching(itemId: number): Promise<PlayHistoryEntry[]> {
     const r = await this.http.get<{ results?: RawPlayHistoryEntry[] }>(`items/v1/${itemId}/continued/`);
     return (r.results ?? []).map(toPlayHistory);
+  }
+
+  clearRecentVideo(itemId: number): Promise<void> {
+    return this.http.del(`items/v1/${itemId}/recent-video/`);
   }
 
   // rate 응답은 갱신된 상태를 돌려줌. (un)wish/hate는 그걸 정규화해 반환(성공 여부는 throw로 판별).

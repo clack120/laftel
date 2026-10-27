@@ -1,11 +1,11 @@
-import { type Debug, Http, type Session } from "./http.ts";
+import { type Debug, Http, type QueryValue, type Session } from "./http.ts";
 import { paginate } from "./paginate.ts";
 import type { LiteralUnion, Paginated } from "./types.ts";
 import { type AccountInfo, toAccount } from "./models.ts";
 import type { RawAuth, RawStatus } from "./raw.ts";
 
 import { Items } from "./api/items.ts";
-import { Episodes } from "./api/episodes.ts";
+import { Episodes, type PlaybackDevice } from "./api/episodes.ts";
 import { Search } from "./api/search.ts";
 import { Comments } from "./api/comments.ts";
 import { Reviews } from "./api/reviews.ts";
@@ -20,6 +20,7 @@ import { Misc } from "./api/misc.ts";
 import { Account } from "./api/account.ts";
 import { FreeView } from "./api/freeview.ts";
 import { Playback } from "./api/playback.ts";
+import { Shorts } from "./api/shorts.ts";
 import { Store } from "./store/index.ts";
 
 export const API_BASE = "https://api.laftel.net/api/";
@@ -31,8 +32,11 @@ export interface LaftelConfig {
   storeBaseUrl?: string;
   fetch?: typeof fetch;
   userAgent?: string;
+  googlebotFallback?: boolean;
+  timeoutMs?: number;
   headers?: Record<string, string>;
   debug?: Debug;
+  device?: PlaybackDevice;
 }
 
 export interface Status {
@@ -84,6 +88,7 @@ export class Laftel {
   readonly account: Account;
   readonly freeView: FreeView;
   readonly playback: Playback;
+  readonly shorts: Shorts;
   readonly store: Store;
 
   constructor(config: LaftelConfig = {}) {
@@ -92,6 +97,8 @@ export class Laftel {
       session: this.session,
       fetch: config.fetch,
       userAgent: config.userAgent,
+      googlebotFallback: config.googlebotFallback,
+      timeoutMs: config.timeoutMs,
       headers: config.headers,
       debug: config.debug,
     };
@@ -99,7 +106,7 @@ export class Laftel {
     this.storeHttp = new Http({ baseUrl: config.storeBaseUrl ?? STORE_BASE, ...shared });
 
     this.items = new Items(this.api);
-    this.episodes = new Episodes(this.api);
+    this.episodes = new Episodes(this.api, config.device);
     this.search = new Search(this.api);
     this.comments = new Comments(this.api);
     this.reviews = new Reviews(this.api);
@@ -114,6 +121,7 @@ export class Laftel {
     this.account = new Account(this.api);
     this.freeView = new FreeView(this.api);
     this.playback = new Playback(this.api);
+    this.shorts = new Shorts(this.api);
     this.store = new Store(this.storeHttp);
   }
 
@@ -158,11 +166,11 @@ export class Laftel {
     return { status: r.status, ip: r.ip, countryCode: r.country_code, localAd: r.local_ad, env: r.env };
   }
 
-  paginate<T>(path: string, query?: Record<string, unknown>): AsyncGenerator<T, void, unknown> {
-    return paginate<T>(this.api, path, query ? { query: query as never } : undefined);
+  paginate<T>(path: string, query?: Record<string, QueryValue>): AsyncGenerator<T, void, unknown> {
+    return paginate<T>(this.api, path, { query });
   }
 
-  page<T>(path: string, query?: Record<string, unknown>): Promise<Paginated<T>> {
-    return this.api.get<Paginated<T>>(path, query ? { query: query as never } : undefined);
+  page<T>(path: string, query?: Record<string, QueryValue>): Promise<Paginated<T>> {
+    return this.api.get<Paginated<T>>(path, { query });
   }
 }

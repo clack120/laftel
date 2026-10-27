@@ -8,12 +8,20 @@ export type CommentSort = LiteralUnion<"top" | "newest" | "like">;
 
 export interface CommentListOptions {
   episodeId?: number;
+  shortsId?: number;
   parentCommentId?: number;
   sort?: CommentSort;
   limit?: number;
   cursor?: string;
   mine?: boolean;
+  withReplies?: boolean;
 }
+
+export type CommentCreateInput = {
+  content: string;
+  spoiler?: boolean;
+  parentComment?: number;
+} & ({ episode: number; shorts?: never } | { episode?: never; shorts: number });
 
 export class Comments {
   constructor(private http: Http) {}
@@ -22,11 +30,13 @@ export class Comments {
     const page = await this.http.get<Paginated<RawComment>>("comments/v1/list/", {
       query: {
         episode_id: opts.episodeId,
+        shorts_id: opts.shortsId,
         parent_comment_id: opts.parentCommentId,
         sorting: opts.sort ?? "top",
         limit: opts.limit,
         cursor: opts.cursor,
         mine: opts.mine,
+        with_replies: opts.withReplies,
       },
     });
     return mapPage(page, (r) => new Comment(r));
@@ -39,16 +49,22 @@ export class Comments {
     return res.comment_count;
   }
 
+  async countShorts(shortsId: number): Promise<number> {
+    const res = await this.http.get<{ comment_count: number }>("comments/v1/count/", {
+      query: { shorts_id: shortsId },
+    });
+    return res.comment_count;
+  }
+
   async get(id: number): Promise<Comment> {
     return new Comment(await this.http.get<RawComment>(`comments/v1/${id}/`));
   }
 
-  create(
-    input: { episode: number; content: string; spoiler?: boolean; parentComment?: number },
-  ): Promise<void> {
+  create(input: CommentCreateInput): Promise<{ id: number }> {
     return this.http.post("comments/v1/list/", {
       body: {
         episode: input.episode,
+        shorts: input.shorts,
         content: input.content,
         is_spoiler: input.spoiler ?? false,
         parent_comment: input.parentComment,

@@ -1,6 +1,25 @@
 import type { Http } from "../http.ts";
 import { kst, text } from "../normalize.ts";
 import type { RawNotice } from "../raw.ts";
+import type { LiteralUnion } from "../types.ts";
+
+export interface NewItemRequestInput {
+  medium: LiteralUnion<"MOVIE" | "TVA" | "OVA">;
+  itemTitle: string;
+  audioSubtitleOption: LiteralUnion<"dubbing" | "subtitle" | "dubbing_and_subtitle">;
+  reason: string;
+  createdAt?: Date;
+}
+
+export interface SubtitleReviewRequestInput {
+  itemTitle: string;
+  episodeNum: string;
+  errorType: LiteralUnion<"mistranslation" | "typo" | "unrelated" | "sync" | "other">;
+  timestamp: string;
+  description: string;
+  isItemTitleInputClean: boolean;
+  createdAt?: Date;
+}
 
 export interface Notice {
   id: number;
@@ -10,17 +29,12 @@ export interface Notice {
   publishedAt: Date | null;
 }
 
-export interface Order {
-  id: number;
-  account: number;
-  items: { productId: number; listPrice: number; price: number; promotionId: number | null }[];
-}
-
 export class Misc {
   constructor(private http: Http) {}
 
-  async currentNotice(): Promise<Notice> {
-    const r = await this.http.get<RawNotice>("notices/v1/current/", { anon: true });
+  async currentNotice(): Promise<Notice | null> {
+    const r = await this.http.get<RawNotice | null>("notices/v1/current/", { anon: true });
+    if (!r) return null;
     return { id: r.id, title: text(r.title), articleUrl: r.zendesk_url, publishedAt: kst(r.published_datetime) };
   }
 
@@ -38,6 +52,32 @@ export class Misc {
 
   npsDismiss(surveyId: number): Promise<void> {
     return this.http.post(`user_requests/v1/nps_surveys/${surveyId}/dismissals/`, { body: {} });
+  }
+
+  requestNewItem(input: NewItemRequestInput): Promise<void> {
+    return this.http.post("user_requests/v1/item_request/", {
+      body: {
+        medium: input.medium,
+        item_title: input.itemTitle,
+        audio_subtitle_option: input.audioSubtitleOption,
+        reason: input.reason,
+        created_at: (input.createdAt ?? new Date()).toISOString(),
+      },
+    });
+  }
+
+  requestSubtitleReview(input: SubtitleReviewRequestInput): Promise<void> {
+    return this.http.post("user_requests/v1/subtitle_review/", {
+      body: {
+        item_title: input.itemTitle,
+        episode_num: input.episodeNum,
+        error_type: input.errorType,
+        timestamp: input.timestamp,
+        description: input.description,
+        is_item_title_input_clean: input.isItemTitleInputClean,
+        created_at: (input.createdAt ?? new Date()).toISOString(),
+      },
+    });
   }
 
   avodAd(id: number): Promise<unknown> {
@@ -62,24 +102,5 @@ export class Misc {
       { anon: true },
     );
     return { words: r.banned_word_list ?? [], replacement: r.replacement_word };
-  }
-
-  /** 구매 주문 생성. product_ids로 주문을 만들고 반환된 id를 payments.charge의 orderId로 사용. */
-  async createOrder(input: { productIds: number[]; itemId?: number }): Promise<Order> {
-    const r = await this.http.post<{
-      id: number;
-      account: number;
-      order_items?: { product_id: number; list_price: number; price: number; promotion_id: number | null }[];
-    }>("orders/v1/list/", { body: { product_ids: input.productIds, item_id: input.itemId } });
-    return {
-      id: r.id,
-      account: r.account,
-      items: (r.order_items ?? []).map((o) => ({
-        productId: o.product_id,
-        listPrice: o.list_price,
-        price: o.price,
-        promotionId: o.promotion_id,
-      })),
-    };
   }
 }

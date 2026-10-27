@@ -19,6 +19,11 @@ export interface StoreProductBadge {
   icon?: string | null;
 }
 
+export interface StoreItemBanner {
+  productNo: number;
+  ottItemId: number;
+}
+
 export class StoreProduct {
   constructor(readonly raw: RawStoreProduct) {}
 
@@ -149,6 +154,24 @@ export class StoreProducts {
 
   purchaseAvailability(productNo: number): Promise<{ purchasable: boolean }> {
     return this.http.get(`v1.0/products/${productNo}/purchase_availability/`);
+  }
+
+  async itemBanners(): Promise<StoreItemBanner[]> {
+    const response = await this.http.get<{ results?: { product_no: number; ott_item_id: number }[] }>(
+      "v1.0/products/item_banners/",
+      { anon: true },
+    );
+    return (response.results ?? []).map((banner) => ({
+      productNo: banner.product_no,
+      ottItemId: banner.ott_item_id,
+    }));
+  }
+
+  async enterEvent(productNo: number): Promise<{ productNo: number }> {
+    const response = await this.http.post<{ product_no: number }>("v1.0/event_entries/", {
+      body: { product_no: productNo },
+    });
+    return { productNo: response.product_no };
   }
 
   /** 로컬 조회이력을 서버에 보내 상품 카드로 하이드레이트. 빈 목록이면 아무것도 안 돌아옴. */

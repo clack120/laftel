@@ -1,9 +1,8 @@
 import type { Laftel } from "./client.ts";
+import type { PlaybackDevice } from "./api/episodes.ts";
 import type { StreamInfo } from "./models.ts";
 
 export const PALLYCON_LICENSE_URL = "https://license.pallycon.com/ri/licenseManager.do";
-
-const LICENSE_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Googlebot/0";
 
 export interface LicenseInfo {
   system: "widevine" | "fairplay" | "playready";
@@ -18,17 +17,15 @@ export interface LicenseInfo {
 
 export function getPssh(mpd: string): string | null {
   const wv = "edef8ba9-79d6-4ace-a3c8-27dcd51d21ed";
-  const at = mpd.toLowerCase().indexOf(wv);
-  if (at === -1) return null;
-  const open = mpd.indexOf("<cenc:pssh", at);
-  if (open === -1) return null;
-  const start = mpd.indexOf(">", open);
-  const end = mpd.indexOf("</cenc:pssh>", start);
-  if (start === -1 || end === -1) return null;
-  return mpd.slice(start + 1, end).trim();
+  for (const block of mpd.matchAll(/<ContentProtection\b([^>]*?)(?:\/>|>([\s\S]*?)<\/ContentProtection\s*>)/g)) {
+    if (!block[1]?.toLowerCase().includes(wv)) continue;
+    const pssh = block[2]?.match(/<cenc:pssh\b[^>]*>([^<]*)<\/cenc:pssh\s*>/)?.[1]?.trim();
+    if (pssh) return pssh;
+  }
+  return null;
 }
 
-export async function getLicenseInfo(client: Laftel, episodeId: number, device = "Web"): Promise<LicenseInfo> {
+export async function getLicenseInfo(client: Laftel, episodeId: number, device?: PlaybackDevice): Promise<LicenseInfo> {
   const stream = await client.episodes.video(episodeId, device);
   return fromStream(client, stream);
 }
@@ -50,7 +47,6 @@ export async function fromStream(client: Laftel, stream: StreamInfo): Promise<Li
     licenseUrl: PALLYCON_LICENSE_URL,
     licenseHeaders: {
       "pallycon-customdata-v2": drm.token,
-      "User-Agent": LICENSE_UA,
       "Origin": "https://laftel.net",
       "Referer": "https://laftel.net/",
     },

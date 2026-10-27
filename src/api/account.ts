@@ -4,16 +4,14 @@ import { LaftelError } from "../errors.ts";
 export class Account {
   constructor(private http: Http) {}
 
-  /*
-  certification(): Promise<unknown> {
-    return this.http.get("accounts/certification/");
+  certification(impUid: string): Promise<{ is_kid?: boolean; [key: string]: unknown }> {
+    return this.http.get("accounts/certification/", { query: { imp_uid: impUid } });
   }
-  */
 
   /** Iamport 본인인증 연동. impUid는 프론트 Iamport SDK 인증 성공 콜백에서 받은 값. */
-  certify(input: { impUid: string; parentImpUid?: string }): Promise<unknown> {
+  certify(input: { impUid: string; parentImpUid?: string; isSignUp?: boolean }): Promise<unknown> {
     return this.http.post("accounts/certification/", {
-      body: { imp_uid: input.impUid, parent_imp_uid: input.parentImpUid },
+      body: { imp_uid: input.impUid, parent_imp_uid: input.parentImpUid, is_sign_up: input.isSignUp },
     });
   }
 
@@ -30,8 +28,7 @@ export class Account {
     return this.http.post("accounts/check_password/", { body: { password } });
   }
 
-  /** 약관/마케팅 수신 동의. agreeToTerms는 기본 true. */
-  consent(input: { marketingConsent: boolean; agreeToTerms?: boolean }): Promise<unknown> {
+  consent(input: { marketingConsent: boolean; agreeToTerms?: boolean }): Promise<void> {
     return this.http.post("accounts/v1/my_consents/", {
       body: { is_marketing_consent: input.marketingConsent, is_agree_to_terms: input.agreeToTerms ?? true },
     });
@@ -71,5 +68,9 @@ export class Account {
   /** 발송된 인증코드(authCode) 확인. */
   confirmEmailAuth(input: { email: string; authCode: string }): Promise<unknown> {
     return this.http.patch("emails/v1/authorize/", { body: { email: input.email, auth_code: input.authCode } });
+  }
+
+  deleteAccount(reason: string): Promise<void> {
+    return this.http.del("v1.0/users/myinfo/", { body: { reason } });
   }
 }

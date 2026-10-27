@@ -27,7 +27,7 @@ export interface Collection {
   name: string;
   key?: string;
   type?: string;
-  sourceKey?: string;
+  sourceKey?: string | number;
   items: Item[];
 }
 
@@ -35,7 +35,7 @@ interface RawCollection {
   name: string;
   collection_key?: string;
   collection_type?: string;
-  source_key?: string;
+  source_key?: string | number;
   items: RawItemCard[];
 }
 
@@ -110,14 +110,15 @@ export class Home {
     }));
   }
 
-  async panorama(): Promise<Panorama> {
+  async panorama(): Promise<Panorama | null> {
     const r = await this.http.get<
       {
         id: number;
         name: string;
         items: { image: string; item_id: number; rating?: number; external_destination?: string | null }[];
-      }
+      } | null
     >("discovery/v1/panorama_collection/", { anon: true });
+    if (!r) return null;
     return {
       id: r.id,
       name: r.name,

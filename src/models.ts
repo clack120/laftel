@@ -9,6 +9,7 @@ import type {
   RawEpisode,
   RawEpisodeProduct,
   RawItem,
+  RawItemCard,
   RawItemLike,
   RawLiveChannel,
   RawLiveProgram,
@@ -202,29 +203,31 @@ export class Item {
   readonly viewable?: boolean;
 
   constructor(readonly raw: RawItemLike) {
-    const r = raw as RawItem & { genres?: string[]; average_score?: number; rating?: number };
+    const r = raw as RawItem & RawItemCard;
+    const animation = r.animation_info;
     this.id = raw.id;
     this.uid = r.uid;
     this.name = text(raw.name);
     this.description = text(r.content ?? r.description);
-    this.genres = r.genre ?? r.genres ?? [];
-    this.tags = r.tags ?? [];
-    this.format = r.medium;
-    this.airPeriod = r.air_year_quarter ?? undefined;
+    this.genres = r.genre ?? r.genres ?? r.tag?.filter((t) => t.type === "장르").map((t) => t.name) ?? [];
+    this.tags = r.tags ?? r.tag?.map((t) => t.name) ?? [];
+    this.format = r.medium ?? animation?.medium;
+    this.airPeriod = r.air_year_quarter ?? animation?.air_year_quarter ?? undefined;
     this.images = images(raw);
     this.thumbnail = this.images.default ?? this.images.custom;
     this.colorCode = r.color_code ?? undefined;
     this.score = r.avg_rating ?? r.average_score;
-    const cr = (raw as { content_rating?: unknown }).content_rating;
-    this.ageRating = typeof cr === "number" ? cr : r.rating ?? r.max_episode_rating?.rating;
+    const cr = r.content_rating;
+    this.ageRating = typeof cr === "number"
+      ? cr
+      : (typeof r.rating === "number" ? r.rating : r.rating?.rating) ?? r.max_episode_rating?.rating;
     this.seriesId = r.series_id;
     this.releaseWeekdays = r.release_weekdays;
-    this.latestEpisodeAt = kst(
-      r.latest_episode_release_datetime ?? (raw as { latest_published_datetime?: string }).latest_published_datetime,
-    );
+    this.latestEpisodeAt = kst(r.latest_episode_release_datetime ?? r.latest_published_datetime);
     this.directors = (r.directors ?? []).map((d) => d.name ?? "").filter(Boolean);
     this.cast = (r.casts ?? []).map((c) => ({ character: c.character_name, voiceActors: c.voice_actor_names ?? [] }));
-    this.studios = (r.production_companies ?? []).map((p) => p.name ?? "").filter(Boolean);
+    this.studios = (r.production_companies ?? (animation?.production ? [animation.production] : []))
+      .map((p) => p.name ?? "").filter(Boolean);
     this.highlightVideo = r.highlight_video
       ? {
         contentId: r.highlight_video.content_id,
@@ -234,12 +237,12 @@ export class Item {
       }
       : null;
     this.adult = r.is_adult;
-    this.dubbed = r.is_dubbed;
-    this.uncensored = r.is_uncensored;
+    this.dubbed = r.is_dubbed ?? animation?.is_dubbed;
+    this.uncensored = r.is_uncensored ?? animation?.is_uncensored;
     this.completed = r.is_ending;
     this.preExclusive = r.is_exclusive;
-    this.laftelOnly = r.is_laftel_only;
-    this.laftelOriginal = r.is_laftel_original;
+    this.laftelOnly = r.is_laftel_only ?? animation?.is_laftel_only;
+    this.laftelOriginal = r.is_laftel_original ?? animation?.is_laftel_original;
     this.avod = r.is_avod;
     this.svod = r.is_svod;
     this.hasEpisodes = r.is_episode_existed;
@@ -334,7 +337,7 @@ export class StreamInfo {
 function drmOf(p: RawStreamInfo["protected_streaming_info"]): Drm | null {
   if (!p) return null;
   const system = p.widevine_token ? "widevine" : p.fairplay_token ? "fairplay" : p.playready_token ? "playready" : null;
-  const token = p.widevine_token ?? p.fairplay_token ?? p.playready_token;
+  const token = p.widevine_token || p.fairplay_token || p.playready_token;
   if (!system || !token) return null;
   return { system, token, contentId: p.content_id, assetId: assetId(p.content_id), accessType: p.access_type };
 }
@@ -356,11 +359,11 @@ function author(p: RawProfileBrief): Author {
 
 export class Comment {
   readonly id: number;
-  readonly parentId: number | null;
+  readonly parentId?: number | null;
   readonly author: Author;
   readonly content?: string;
   readonly likes: number;
-  readonly replyCount: number;
+  readonly replyCount?: number;
   readonly spoiler: boolean;
   readonly liked: boolean;
   readonly createdAt: Date | null;
@@ -369,6 +372,10 @@ export class Comment {
   readonly itemName?: string;
   readonly episodeId?: number;
   readonly episodeLabel?: string;
+  readonly shortsId?: number;
+  readonly shortsTitle?: string;
+  readonly shortsThumbnail?: string;
+  readonly replies: Comment[];
 
   constructor(readonly raw: RawComment) {
     this.id = raw.id;
@@ -385,6 +392,10 @@ export class Comment {
     this.itemName = text(raw.item?.name);
     this.episodeId = raw.episode?.id;
     this.episodeLabel = raw.episode?.episode_num ? episodeLabel(raw.episode.episode_num) : undefined;
+    this.shortsId = raw.shorts?.id;
+    this.shortsTitle = text(raw.shorts?.title);
+    this.shortsThumbnail = raw.shorts?.thumbnail_path ?? undefined;
+    this.replies = (raw.replies ?? []).map((reply) => new Comment(reply));
   }
 }
 
@@ -410,7 +421,7 @@ export class Review {
     this.liked = raw.is_click_like;
     this.createdAt = kst(raw.created);
     this.modifiedAt = kst(raw.modified);
-    this.itemId = raw.item;
+    this.itemId = typeof raw.item === "object" && raw.item !== null ? raw.item.id : raw.item;
   }
 }
 
@@ -499,12 +510,24 @@ export class ContinueWatchingEntry {
   /** true=다음 화 처음부터, false=progressRatio 지점부터 이어보기 */
   readonly playNextEpisode: boolean;
   readonly item: Item;
-  readonly episode?: Episode;
+  readonly episode?: Pick<Episode, "id" | "episodeLabel" | "title" | "thumbnail" | "publishedAt"> & {
+    readonly raw: NonNullable<RawContinueWatching["episode"]>;
+  };
 
   constructor(readonly raw: RawContinueWatching) {
     this.progressRatio = raw.progress;
     this.playNextEpisode = raw.play_next;
     this.item = new Item(raw.item);
-    this.episode = raw.episode ? new Episode(raw.episode) : undefined;
+    const episode = raw.episode;
+    this.episode = episode
+      ? {
+        raw: episode,
+        id: episode.id,
+        episodeLabel: episodeLabel(episode.episode_num),
+        title: text(episode.subject),
+        thumbnail: episode.thumbnail_path || undefined,
+        publishedAt: kst(episode.published_datetime),
+      }
+      : undefined;
   }
 }

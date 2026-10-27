@@ -11,7 +11,6 @@ export async function* paginate<T>(
     for (const item of page.results ?? []) yield item;
     const next = page.next;
     if (!next) return;
-    // next는 풀 URL (쿼리 포함) -> query 옵션 없이 그대로 따라감
     page = await http.get<Paginated<T>>(next, opts && { anon: opts.anon, signal: opts.signal, headers: opts.headers });
   }
 }
@@ -22,6 +21,7 @@ export function mapPage<R, M>(page: Paginated<R>, fn: (r: R) => M): Paginated<M>
 
 export async function collect<T>(gen: AsyncGenerator<T>, limit = Infinity): Promise<T[]> {
   const out: T[] = [];
+  if (limit <= 0) return out;
   for await (const item of gen) {
     out.push(item);
     if (out.length >= limit) break;

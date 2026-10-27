@@ -6,6 +6,7 @@ import type { LiteralUnion, Paginated } from "../types.ts";
 import type { AccessType, RawEpisode, RawEpisodeProduct, RawStreamInfo } from "../raw.ts";
 
 export type EpisodeSort = LiteralUnion<"newest" | "oldest">;
+export type PlaybackDevice = LiteralUnion<"Web" | "Android">;
 
 export interface VideoPermission {
   episodeId: number;
@@ -16,7 +17,7 @@ export interface VideoPermission {
 }
 
 export class Episodes {
-  constructor(private http: Http) {}
+  constructor(private http: Http, private readonly defaultDevice: PlaybackDevice = "Web") {}
 
   async list(itemId: number, opts: { sort?: EpisodeSort; limit?: number } = {}): Promise<Paginated<Episode>> {
     const page = await this.http.get<Paginated<RawEpisode>>("episodes/v3/list/", {
@@ -36,9 +37,15 @@ export class Episodes {
     return raw ? new StreamInfo(raw) : null;
   }
 
-  async video(episodeId: number, device = "Web"): Promise<StreamInfo> {
+  async video(episodeId: number, device: PlaybackDevice = this.defaultDevice): Promise<StreamInfo> {
     return new StreamInfo(
       await this.http.post<RawStreamInfo>(`episodes/v3/${episodeId}/video/`, { query: { device } }),
+    );
+  }
+
+  async videoV4(episodeId: number, device: PlaybackDevice = this.defaultDevice): Promise<StreamInfo> {
+    return new StreamInfo(
+      await this.http.post<RawStreamInfo>(`episodes/v4/${episodeId}/video/`, { query: { device } }),
     );
   }
 
@@ -62,12 +69,6 @@ export class Episodes {
       itemExpiresAt: kst(r.item_expire_datetime),
     }));
   }
-
-  /* 프론트 측 js에 있는 유령
-  videoThumbnail(episodeId: number): Promise<unknown> {
-    return this.http.get(`episodes/v1/${episodeId}/video-thumbnail/`, { anon: true });
-  }
-  */
 
   /** 작품의 TVOD(대여/소장) 상품 목록. */
   async products(itemId: number): Promise<EpisodeProduct[]> {
