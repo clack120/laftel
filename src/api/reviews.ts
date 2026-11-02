@@ -10,9 +10,17 @@ export type RatingSort = LiteralUnion<"add" | "my_rating">;
 
 /** 내가 준 별점(리뷰와는 다른 개념임). score=별점 값. */
 export interface MyRating {
+  readonly raw: RawMyRating;
   id: number;
   score: number;
   item: Item;
+}
+
+export interface RawMyRating {
+  id: number;
+  value: number;
+  item: RawItemCard;
+  [key: string]: unknown;
 }
 
 export class Reviews {
@@ -47,11 +55,11 @@ export class Reviews {
   async myRatings(
     opts: ApiOptions & { sort?: RatingSort; offset?: number; limit?: number } = {},
   ): Promise<Paginated<MyRating>> {
-    const page = await this.http.get<Paginated<{ id: number; value: number; item: RawItemCard }>>(
+    const page = await this.http.get<Paginated<RawMyRating>>(
       "reviews/v1/my_ratings/",
       { anon: opts.anon, signal: opts.signal, query: { sorting: opts.sort, offset: opts.offset, limit: opts.limit } },
     );
-    return mapPage(page, (r) => ({ id: r.id, score: r.value, item: new Item(r.item) }));
+    return mapPage(page, (r) => ({ raw: r, id: r.id, score: r.value, item: new Item(r.item) }));
   }
 
   async myReviews(

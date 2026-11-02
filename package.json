@@ -1,8 +1,12 @@
 {
   "name": "@clack120/laftel",
   "description": "비공식 라프텔 TypeScript SDK",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clack120/laftel.git"
+  },
   "exports": {
     ".": {
       "types": "./dist/mod.d.ts",
@@ -25,11 +29,12 @@
   "sideEffects": false,
   "scripts": {
     "build": "node scripts/build.mjs",
+    "prepack": "npm run build",
     "check": "tsc --noEmit",
     "gen:constants": "npm run build && node scripts/gen-constants.mjs"
   },
   "devDependencies": {
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "typescript": "^7.0.2"
   },
   "license": "Unlicense"

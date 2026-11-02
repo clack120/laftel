@@ -5,6 +5,7 @@ import type { LiteralUnion } from "../types.ts";
 import type { RawMembership, RawMembershipProduct, RawReservedMembership } from "../raw.ts";
 
 export interface MembershipProduct {
+  readonly raw: RawMembershipProduct;
   id?: number;
   name?: string;
   type?: LiteralUnion<"basic" | "premium">;
@@ -12,9 +13,11 @@ export interface MembershipProduct {
   period?: string;
   provider?: string;
   autoRenewable?: boolean;
+  promotion?: unknown;
 }
 
 export interface Membership {
+  readonly raw: RawMembership;
   product?: MembershipProduct;
   expiresAt: Date | null;
   maxProfiles?: number;
@@ -24,6 +27,7 @@ export interface Membership {
 
 /** 다음 결제 예정(예약된) 멤버십. current와 모양이 다름. */
 export interface ScheduledMembership {
+  readonly raw: RawReservedMembership;
   status?: string;
   nextPaymentAt: Date | null;
   product?: MembershipProduct;
@@ -33,6 +37,7 @@ export interface ScheduledMembership {
 export type MembershipRequestOptions = ApiOptions;
 
 export const toMembershipProduct = (r: RawMembershipProduct): MembershipProduct => ({
+  raw: r,
   id: r.id,
   name: r.name,
   type: r.membership_type,
@@ -40,9 +45,11 @@ export const toMembershipProduct = (r: RawMembershipProduct): MembershipProduct 
   period: r.period,
   provider: r.provider,
   autoRenewable: r.is_active_renewable,
+  promotion: r.promotion,
 });
 
 export const toMembership = (r: RawMembership): Membership => ({
+  raw: r,
   product: r.product ? toMembershipProduct(r.product) : undefined,
   expiresAt: kst(r.expire_datetime),
   maxProfiles: r.max_profile_count,
@@ -63,6 +70,7 @@ export class Memberships {
     const r = await this.http.get<RawReservedMembership | null>("memberships/v1/reserved/", opts);
     if (!r) return null;
     return {
+      raw: r,
       status: r.status,
       nextPaymentAt: kst(r.next_payment_date),
       product: r.product ? toMembershipProduct(r.product) : undefined,
@@ -76,8 +84,18 @@ export class Memberships {
     }).then((r) => ({ upgradeAvailable: r.upgrade_available, days: r.days }));
   }
 
+  /** v3 product selection differs from productsV2(); versions are not interchangeable. */
   async products(opts: ApiOptions = {}): Promise<MembershipProduct[]> {
     const res = await this.http.get<{ products: RawMembershipProduct[] }>("products/v3/membership_products/", {
+      ...opts,
+      anon: opts.anon ?? this.http.anon ?? true,
+    });
+    return res.products.map(toMembershipProduct);
+  }
+
+  /** Legacy v2 product selection; listing does not imply purchase eligibility. */
+  async productsV2(opts: ApiOptions = {}): Promise<MembershipProduct[]> {
+    const res = await this.http.get<{ products: RawMembershipProduct[] }>("products/v2/membership_products/", {
       ...opts,
       anon: opts.anon ?? this.http.anon ?? true,
     });

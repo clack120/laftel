@@ -138,11 +138,23 @@ export interface PayPasswordStatus {
 }
 
 export interface PointProduct {
+  readonly raw: RawPointProduct;
   id: number;
   name: string;
   listPrice: number;
   pointAmount: number;
   providerProductId: string;
+  promotion?: unknown;
+}
+
+export interface RawPointProduct {
+  id: number;
+  name: string;
+  list_price: number;
+  point_amount: number;
+  provider_product_id: string;
+  promotion?: unknown;
+  [key: string]: unknown;
 }
 
 export interface OrderSheetLine {
@@ -576,21 +588,15 @@ export function charge(client: PaymentClient, input: Charge): Promise<void> {
 }
 
 export async function pointProducts(client: PaymentClient): Promise<PointProduct[]> {
-  const response = await client.api.get<{
-    products?: Array<{
-      id: number;
-      name: string;
-      list_price: number;
-      point_amount: number;
-      provider_product_id: string;
-    }>;
-  }>("products/v2/point_products/");
-  return (response.products ?? []).map((product) => ({
+  const response = await client.api.get<{ products: RawPointProduct[] }>("products/v2/point_products/");
+  return response.products.map((product) => ({
+    raw: product,
     id: product.id,
     name: product.name,
     listPrice: product.list_price,
     pointAmount: product.point_amount,
     providerProductId: product.provider_product_id,
+    promotion: product.promotion,
   }));
 }
 
@@ -635,6 +641,11 @@ export async function createOrderSheet(
     },
   });
   return { orderSheetId: response.order_sheet_id };
+}
+
+/** Retrieve a draft with its saved receiver and current totals. */
+export function getOrderSheet(client: PaymentClient, uid: string): Promise<StoreOrderSheet> {
+  return client.storeHttp.get<StoreOrderSheet>(`v1.0/order_sheets/${encodeURIComponent(uid)}/`);
 }
 
 const toRawReceiver = (receiver: StoreReceiver): StoreOrderSheet["receiver"] => ({

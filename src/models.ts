@@ -30,6 +30,7 @@ import type {
 
 /** 결제 수단 (일부 정보는 마스킹된 상태로 옴) */
 export interface BillingInfo {
+  readonly raw: RawBillingInfo;
   id?: number;
   pgType?: string;
   billingType?: string;
@@ -41,6 +42,7 @@ export interface BillingInfo {
 
 export function toBillingInfo(r: RawBillingInfo): BillingInfo {
   return {
+    raw: r,
     id: r.id,
     pgType: r.pg_type,
     billingType: r.billing_type,
@@ -52,6 +54,7 @@ export function toBillingInfo(r: RawBillingInfo): BillingInfo {
 }
 
 export interface AccountInfo {
+  readonly raw: RawAccount;
   /** users.*(continueWatching/playHistory 등) 호출에 쓰는 user id. */
   id: number;
   username?: string;
@@ -67,7 +70,7 @@ export interface AccountInfo {
   adult?: boolean;
   agreedToTerms?: boolean;
   /** 연결된 로그인 수단(email/google/kakao/apple 등). */
-  accountTypes: string[];
+  accountTypes?: string[];
   /** 보유 포인트 잔액. */
   pointBalance?: number;
   hasPayPassword?: boolean;
@@ -77,6 +80,7 @@ export interface AccountInfo {
 
 export function toAccount(r: RawAccount): AccountInfo {
   return {
+    raw: r,
     id: r.id,
     username: r.username,
     firstName: r.first_name,
@@ -88,7 +92,7 @@ export function toAccount(r: RawAccount): AccountInfo {
     certified: r.certified,
     adult: r.is_adult,
     agreedToTerms: r.is_agree_to_terms,
-    accountTypes: r.account_types ?? [],
+    accountTypes: r.account_types,
     pointBalance: r.asset_point,
     hasPayPassword: r.has_pay_password,
     iapUuid: r.iap_uuid,
@@ -96,25 +100,34 @@ export function toAccount(r: RawAccount): AccountInfo {
 }
 
 export interface ProfileStatistics {
+  readonly raw: RawProfileStatistics;
   /** 정주행 완료작 수 */
-  finishedCount: number;
+  finishedCount?: number;
   /** 별점 준 작품 수 */
-  ratingCount: number;
+  ratingCount?: number;
   /** 한줄평 수 */
-  reviewCount: number;
-  commentCount: number;
+  reviewCount?: number;
+  commentCount?: number;
 }
 
 export function toProfileStatistics(r: RawProfileStatistics): ProfileStatistics {
   return {
-    finishedCount: r.finished_item_count ?? 0,
-    ratingCount: r.rating_count ?? 0,
-    reviewCount: r.short_review_count ?? 0,
-    commentCount: r.comment_count ?? 0,
+    raw: r,
+    finishedCount: r.finished_item_count,
+    ratingCount: r.rating_count,
+    reviewCount: r.short_review_count,
+    commentCount: r.comment_count,
   };
 }
 
 const THUMB = "https://thumbnail.laftel.net/";
+const CONTENT_RATINGS: Readonly<Record<string, AgeRating | undefined>> = {
+  "전체 이용가": 0,
+  "7세 이용가": 7,
+  "12세 이용가": 12,
+  "15세 이용가": 15,
+  "성인 이용가": 19,
+};
 
 function abs(url: string | null | undefined): string | undefined {
   if (!url) return undefined;
@@ -139,7 +152,10 @@ function images(raw: RawItemLike): ImageSet {
     if (img.option_name === "home_default") set.default = abs(img.img_url);
     else if (img.option_name === "home_custom") set.custom = abs(img.img_url);
   }
-  if (!set.default) set.default = abs((raw as { img?: string }).img) ?? abs((raw as { home_img?: string }).home_img);
+  if (!set.default) {
+    const card = raw as RawItemCard;
+    set.default = abs(card.img) ?? abs(card.img_url) ?? abs(card.home_img);
+  }
   const logo = (raw as RawItem).logo_img;
   if (logo) set.logo = abs(logo);
   return set;
@@ -147,7 +163,7 @@ function images(raw: RawItemLike): ImageSet {
 
 export interface CastMember {
   character?: string;
-  voiceActors: string[];
+  voiceActors?: string[];
 }
 
 /** 작품 소개용 대표 영상(PV/티저). */
@@ -160,25 +176,29 @@ export interface HighlightVideo {
 
 /** 에피소드 개별 구매 상품(TVOD 대여/소장). */
 export interface EpisodeProduct {
+  readonly raw: RawEpisodeProduct;
   id?: number;
   name?: string;
   listPrice?: number;
   period?: string;
+  promotion?: unknown;
 }
 
 export function toEpisodeProduct(r: RawEpisodeProduct): EpisodeProduct {
-  return { id: r.id, name: r.name, listPrice: r.list_price, period: r.period };
+  return { raw: r, id: r.id, name: r.name, listPrice: r.list_price, period: r.period, promotion: r.promotion };
 }
 
-export class Item {
+/** A source-specific projection; omitted fields stay undefined and raw retains the response. */
+export class Item<R extends RawItemLike = RawItemLike> {
   readonly id: number;
   readonly uid?: string;
   readonly name?: string;
   readonly description?: string;
-  readonly genres: string[];
-  readonly tags: string[];
+  /** Source-specific genres; v2 and v4 can return different lists for the same item. */
+  readonly genres?: string[];
+  readonly tags?: string[];
   readonly format?: Medium;
-  /** 방영/개봉 시기 라벨(파싱용 아님). 예: "2020년 4분기", 다분기작은 "1996년, 1997년" */
+  /** Display label; formatting depends on the endpoint. */
   readonly airPeriod?: string;
   readonly images: ImageSet;
   readonly thumbnail?: string;
@@ -187,11 +207,15 @@ export class Item {
   readonly ageRating?: AgeRating;
   readonly seriesId?: number | null;
   readonly releaseWeekdays?: string[];
-  readonly latestEpisodeAt: Date | null;
-  readonly directors: string[];
-  readonly cast: CastMember[];
-  readonly studios: string[];
-  readonly highlightVideo: HighlightVideo | null;
+  /** undefined: omitted; null: no usable date; a Date is converted from KST. */
+  readonly latestEpisodeAt: Date | null | undefined;
+  /** undefined: omitted by this endpoint; []: an explicitly empty credits list. */
+  readonly directors?: string[];
+  /** undefined: omitted by this endpoint; []: an explicitly empty credits list. */
+  readonly cast?: CastMember[];
+  /** undefined: omitted by this endpoint; production/distributor is not a studio. */
+  readonly studios?: string[];
+  readonly highlightVideo: HighlightVideo | null | undefined;
   // 플래그는 카드 응답이 생략할 수 있음
   readonly adult?: boolean;
   readonly dubbed?: boolean;
@@ -210,32 +234,34 @@ export class Item {
   readonly upcoming?: boolean;
   readonly viewable?: boolean;
 
-  constructor(readonly raw: RawItemLike) {
-    const r = raw as RawItem & RawItemCard;
+  constructor(readonly raw: R) {
+    const r = raw as Partial<RawItem> & RawItemCard;
     const animation = r.animation_info;
     this.id = raw.id;
     this.uid = r.uid;
     this.name = text(raw.name);
     this.description = text(r.content ?? r.description);
-    this.genres = r.genre ?? r.genres ?? r.tag?.filter((t) => t.type === "장르").map((t) => t.name) ?? [];
-    this.tags = r.tags ?? r.tag?.map((t) => t.name) ?? [];
+    this.genres = r.genre ?? r.genres ?? r.genre_tag_list ?? r.tag?.filter((t) => t.type === "장르").map((t) => t.name);
+    this.tags = r.tags ?? r.tag?.map((t) => t.name);
     this.format = r.medium ?? animation?.medium;
     this.airPeriod = r.air_year_quarter ?? animation?.air_year_quarter ?? undefined;
     this.images = images(raw);
     this.thumbnail = this.images.default ?? this.images.custom;
     this.colorCode = r.color_code ?? undefined;
     this.score = r.avg_rating ?? r.average_score;
-    const cr = r.content_rating;
+    const cr = typeof r.content_rating === "string" ? CONTENT_RATINGS[r.content_rating] : r.content_rating;
     this.ageRating = typeof cr === "number"
       ? cr
       : (typeof r.rating === "number" ? r.rating : r.rating?.rating) ?? r.max_episode_rating?.rating;
     this.seriesId = r.series_id;
     this.releaseWeekdays = r.release_weekdays;
-    this.latestEpisodeAt = kst(r.latest_episode_release_datetime ?? r.latest_published_datetime);
-    this.directors = (r.directors ?? []).map((d) => d.name ?? "").filter(Boolean);
-    this.cast = (r.casts ?? []).map((c) => ({ character: c.character_name, voiceActors: c.voice_actor_names ?? [] }));
-    this.studios = (r.production_companies ?? (animation?.production ? [animation.production] : []))
-      .map((p) => p.name ?? "").filter(Boolean);
+    const latest = r.latest_episode_release_datetime !== undefined
+      ? r.latest_episode_release_datetime
+      : r.latest_published_datetime;
+    this.latestEpisodeAt = latest === undefined ? undefined : kst(latest);
+    this.directors = r.directors?.map((d) => d.name ?? "").filter(Boolean);
+    this.cast = r.casts?.map((c) => ({ character: c.character_name, voiceActors: c.voice_actor_names }));
+    this.studios = r.production_companies?.map((p) => p.name ?? "").filter(Boolean);
     this.highlightVideo = r.highlight_video
       ? {
         contentId: r.highlight_video.content_id,
@@ -243,7 +269,7 @@ export class Item {
         dash: r.highlight_video.dash_url,
         hls: r.highlight_video.hls_url,
       }
-      : null;
+      : r.highlight_video;
     this.adult = r.is_adult;
     this.dubbed = r.is_dubbed ?? animation?.is_dubbed;
     this.uncensored = r.is_uncensored ?? animation?.is_uncensored;
@@ -256,14 +282,16 @@ export class Item {
     this.hasEpisodes = r.is_episode_existed;
     this.newRelease = r.is_new_release;
     this.upcoming = r.is_upcoming_release;
-    this.viewable = r.is_viewing;
+    this.viewable = r.is_viewing ?? r.is_viewable;
   }
 }
 
 export class Episode {
   readonly id: number;
-  /** 화수 라벨(숫자 아닐 수 있음). 예: "1", "25", "특별편" */
+  /** Display episode label, not a sortable number. */
   readonly episodeLabel: string;
+  /** Sorting order, independent of the displayed episode label. */
+  readonly episodeOrder: number;
   readonly title?: string;
   readonly workTitle?: string;
   readonly thumbnail?: string;
@@ -284,6 +312,7 @@ export class Episode {
   constructor(readonly raw: RawEpisode) {
     this.id = raw.id;
     this.episodeLabel = episodeLabel(raw.episode_num);
+    this.episodeOrder = raw.episode_order;
     this.title = text(raw.subject);
     this.workTitle = text(raw.title);
     this.thumbnail = raw.thumbnail_path || undefined;
@@ -320,7 +349,7 @@ export class StreamInfo {
   readonly thumbnail?: string;
   readonly opening: TimeRange | null;
   readonly ending: TimeRange | null;
-  readonly playLogId?: number;
+  readonly playLogId?: number | null;
   readonly nextEpisodeId?: number;
 
   constructor(readonly raw: RawStreamInfo) {
@@ -435,6 +464,8 @@ export class Review {
 
 export class Profile {
   readonly id: number;
+  readonly uid?: string;
+  readonly hiddenGenres?: RawProfile["hidden_genres"];
   /** user-scoped API(users.continueWatching/playHistory 등)에 쓰는 id. 프로필마다 다름 */
   readonly userId?: number;
   /** 부모 계정 id. 한 계정의 프로필들이 공유 */
@@ -452,6 +483,8 @@ export class Profile {
 
   constructor(readonly raw: RawProfile) {
     this.id = raw.id;
+    this.uid = raw.profile_uid;
+    this.hiddenGenres = raw.hidden_genres;
     this.userId = raw.user_id;
     this.accountId = raw.account_id;
     this.name = raw.name;

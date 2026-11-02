@@ -8,10 +8,12 @@ import type { RawContinueWatching, RawPlayHistoryEntry } from "../raw.ts";
 export type PlayHistorySort = LiteralUnion<"recent">;
 
 export interface PlayHistoryEntry {
+  readonly raw: RawPlayHistoryEntry;
   item: Item;
   lastPlayed?: {
     episodeId: number;
-    episodeLabel: string;
+    episodeLabel?: string;
+    accessType?: string | null;
     thumbnail?: string;
     /** 0~1 float */
     progressRatio?: number;
@@ -21,6 +23,7 @@ export interface PlayHistoryEntry {
 export function toPlayHistory(r: RawPlayHistoryEntry): PlayHistoryEntry {
   const e = r.last_played_episode_info;
   return {
+    raw: r,
     item: new Item(r),
     lastPlayed: e
       ? {
@@ -29,6 +32,8 @@ export function toPlayHistory(r: RawPlayHistoryEntry): PlayHistoryEntry {
         thumbnail: e.episode_img ?? undefined,
         progressRatio: e.progressbar ?? undefined,
       }
+      : r.last_play_episode
+      ? { episodeId: r.last_play_episode.id, accessType: r.last_play_episode.access_type }
       : undefined,
   };
 }

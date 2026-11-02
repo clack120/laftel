@@ -9,6 +9,7 @@ import type {
   RawItemRequest,
   RawItemStatistics,
   RawItemUserState,
+  RawItemV2,
   RawPlayHistoryEntry,
 } from "../raw.ts";
 import { type PlayHistoryEntry, toPlayHistory } from "./users.ts";
@@ -77,7 +78,8 @@ const toItemRequest = (r: RawItemRequest): ItemRequest => ({
 export class Items {
   constructor(private http: Http) {}
 
-  async get(id: number, opts: ApiOptions = {}): Promise<Item> {
+  /** Full v4 detail, including credits, UID and release dates. */
+  async get(id: number, opts: ApiOptions = {}): Promise<Item<RawItem>> {
     return new Item(
       await this.http.get<RawItem>(`items/v4/${id}/`, {
         anon: opts.anon ?? this.http.anon ?? true,
@@ -86,9 +88,10 @@ export class Items {
     );
   }
 
-  async getV2(id: number, opts: ApiOptions = {}): Promise<Item> {
+  /** Legacy v2 detail; omits credits, UID and release flags, and can differ from get() in other fields. */
+  async getV2(id: number, opts: ApiOptions = {}): Promise<Item<RawItemV2>> {
     return new Item(
-      await this.http.get<RawItemCard>(`items/v2/${id}/`, {
+      await this.http.get<RawItemV2>(`items/v2/${id}/`, {
         anon: opts.anon ?? this.http.anon ?? true,
         signal: opts.signal,
       }),

@@ -3,17 +3,19 @@ import { mapPage } from "../paginate.ts";
 import { Episode, type EpisodeProduct, StreamInfo, toEpisodeProduct } from "../models.ts";
 import { kst } from "../normalize.ts";
 import type { LiteralUnion, Paginated } from "../types.ts";
-import type { AccessType, RawEpisode, RawEpisodeProduct, RawStreamInfo } from "../raw.ts";
+import type { AccessType, RawEpisode, RawEpisodeProduct, RawStreamInfo, RawVideoPermission } from "../raw.ts";
 
 export type EpisodeSort = LiteralUnion<"newest" | "oldest">;
 export type PlaybackDevice = LiteralUnion<"Web" | "Android">;
 
 export interface VideoPermission {
+  readonly raw: RawVideoPermission;
   episodeId: number;
   accessType: AccessType;
   inAppDownload: boolean;
   membershipEndsAt: Date | null;
   itemExpiresAt: Date | null;
+  accessInfoList?: unknown[];
 }
 
 export class Episodes {
@@ -21,10 +23,10 @@ export class Episodes {
 
   async list(
     itemId: number,
-    opts: ApiOptions & { sort?: EpisodeSort; limit?: number } = {},
+    opts: ApiOptions & { sort?: EpisodeSort; limit?: number; offset?: number } = {},
   ): Promise<Paginated<Episode>> {
     const page = await this.http.get<Paginated<RawEpisode>>("episodes/v3/list/", {
-      query: { item_id: itemId, sort: opts.sort, limit: opts.limit },
+      query: { item_id: itemId, sort: opts.sort, limit: opts.limit, offset: opts.offset },
       anon: opts.anon ?? this.http.anon ?? true,
       signal: opts.signal,
     });
@@ -52,6 +54,7 @@ export class Episodes {
     );
   }
 
+  /** v4 playback; response parity with video() is not guaranteed. */
   async videoV4(episodeId: number, device: PlaybackDevice = this.defaultDevice): Promise<StreamInfo> {
     return new StreamInfo(
       await this.http.post<RawStreamInfo>(`episodes/v4/${episodeId}/video/`, { query: { device } }),
@@ -59,23 +62,17 @@ export class Episodes {
   }
 
   async videoPermission(opts: { episodeIds?: number[]; itemId?: number } = {}): Promise<VideoPermission[]> {
-    const page = await this.http.get<
-      Paginated<
-        {
-          episode_id: number;
-          access_type: AccessType;
-          in_app_download: boolean;
-          membership_end_datetime: string | null;
-          item_expire_datetime: string | null;
-        }
-      >
-    >("episodes/v1/video/permission/", { query: { episode_ids: opts.episodeIds, item_id: opts.itemId } });
+    const page = await this.http.get<Paginated<RawVideoPermission>>("episodes/v1/video/permission/", {
+      query: { episode_ids: opts.episodeIds, item_id: opts.itemId },
+    });
     return (page.results ?? []).map((r) => ({
+      raw: r,
       episodeId: r.episode_id,
       accessType: r.access_type,
       inAppDownload: r.in_app_download,
       membershipEndsAt: kst(r.membership_end_datetime),
       itemExpiresAt: kst(r.item_expire_datetime),
+      accessInfoList: r.access_info_list,
     }));
   }
 

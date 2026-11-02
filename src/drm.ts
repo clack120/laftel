@@ -17,9 +17,11 @@ export interface LicenseInfo {
 
 export function getPssh(mpd: string): string | null {
   const wv = "edef8ba9-79d6-4ace-a3c8-27dcd51d21ed";
-  for (const block of mpd.matchAll(/<ContentProtection\b([^>]*?)(?:\/>|>([\s\S]*?)<\/ContentProtection\s*>)/g)) {
-    if (!block[1]?.toLowerCase().includes(wv)) continue;
-    const pssh = block[2]?.match(/<cenc:pssh\b[^>]*>([^<]*)<\/cenc:pssh\s*>/)?.[1]?.trim();
+  const protection = /<((?:[\w.-]+:)?ContentProtection)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1\s*>)/g;
+  for (const block of mpd.matchAll(protection)) {
+    const scheme = block[2]?.match(/\bschemeIdUri\s*=\s*["']([^"']*)["']/)?.[1];
+    if (scheme?.toLowerCase() !== `urn:uuid:${wv}`) continue;
+    const pssh = block[3]?.match(/<((?:[\w.-]+:)?pssh)\b[^>]*>([^<]*)<\/\1\s*>/)?.[2]?.replace(/\s+/g, "");
     if (pssh) return pssh;
   }
   return null;

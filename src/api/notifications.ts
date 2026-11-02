@@ -5,22 +5,26 @@ import type { LiteralUnion, Paginated } from "../types.ts";
 import type { RawNotification } from "../raw.ts";
 
 export interface Notification {
+  readonly raw: RawNotification;
   id?: number;
   type?: string;
-  status?: LiteralUnion<"read" | "unread">;
+  status?: LiteralUnion<"read" | "unread" | "unread_new">;
   title?: string;
   description?: string;
   content?: string;
-  icon?: string;
-  image?: string;
+  icon?: string | null;
+  image?: string | null;
   itemId?: number;
   episodeId?: number;
+  premiereId?: number;
+  extraData?: RawNotification["extra_data"];
   createdAt: Date | null;
   endsAt: Date | null;
 }
 
 function toNotification(r: RawNotification): Notification {
   return {
+    raw: r,
     id: r.id,
     type: r.notification_type ?? r.type,
     status: r.status,
@@ -31,6 +35,8 @@ function toNotification(r: RawNotification): Notification {
     image: r.image,
     itemId: r.extra_data?.item_id,
     episodeId: r.extra_data?.episode_id,
+    premiereId: r.extra_data?.premiere_id,
+    extraData: r.extra_data,
     createdAt: kst(r.created),
     endsAt: kst(r.end_datetime),
   };

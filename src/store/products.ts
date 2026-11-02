@@ -58,7 +58,7 @@ export class StoreProduct {
     return this.raw.product_name;
   }
   get thumbnail(): string | undefined {
-    return this.raw.thumbnail_url;
+    return this.raw.thumbnail_url ?? this.raw.thumbnail;
   }
   get smallImage(): string | undefined {
     return this.raw.small_image_url;
@@ -94,8 +94,11 @@ export class StoreProduct {
   get classification(): StoreClassificationRef | undefined {
     return this.raw.classification;
   }
-  get badges(): StoreProductBadge[] {
-    return (this.raw.badges_with_meta ?? []).map((b) => ({
+  get badgeCodes(): string[] | undefined {
+    return this.raw.badges;
+  }
+  get badges(): StoreProductBadge[] | undefined {
+    return this.raw.badges_with_meta?.map((b) => ({
       code: b.code,
       text: b.text,
       backgroundColor: b.background_color,
@@ -139,10 +142,11 @@ export class StoreProducts {
     return this.list({ ...opts, ottItemUid });
   }
 
-  /** Legacy item-linked products. */
-  itemRelated(itemId: number, opts: StoreProductRequestOptions = {}): Promise<unknown> {
+  /** Legacy item-linked products, selected by Item.uid. */
+  itemRelated(ottItemUid: string, opts: StoreProductRequestOptions = {}): Promise<unknown> {
+    if (typeof ottItemUid !== "string" || !ottItemUid.trim()) throw new TypeError("item UID must not be empty");
     return this.http.get("v1.0/products/item_related/", {
-      query: { item_id: positiveId(itemId) },
+      query: { item_uid: ottItemUid },
       anon: opts.anon ?? this.http.anon ?? true,
       signal: opts.signal,
     });
@@ -158,6 +162,7 @@ export class StoreProducts {
     });
   }
 
+  /** v2 paginated search; richer images/classification than legacy searchV1(). */
   async search(
     keyword: string,
     opts: ApiOptions & { sort?: StoreSort; offset?: number; limit?: number } = {},
@@ -168,6 +173,16 @@ export class StoreProducts {
       signal: opts.signal,
     });
     return mapPage(page, (r) => new StoreProduct(r));
+  }
+
+  /** Legacy array response; use search() for paginated results. */
+  async searchV1(keyword: string, opts: ApiOptions = {}): Promise<StoreProduct[]> {
+    const rows = await this.http.get<RawStoreProduct[]>("v1.0/products/search/", {
+      query: { keyword },
+      anon: opts.anon ?? this.http.anon ?? true,
+      signal: opts.signal,
+    });
+    return rows.map((r) => new StoreProduct(r));
   }
 
   // period는 필수(없으면 400). 실측상 daily/weekly만 유효.

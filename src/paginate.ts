@@ -13,7 +13,7 @@ export async function* paginate<T>(
     if (seen.has(cursor)) throw new Error("Repeated a pagination cursor");
     seen.add(cursor);
     const page = await http.get<Paginated<T>>(path, options);
-    for (const item of page.results ?? []) yield item;
+    for (const item of pageResults(page)) yield item;
     const next = page.next;
     if (!next) return;
     path = new URL(next, cursor).href;
@@ -29,7 +29,12 @@ export function paginationCursor(http: Http, path: string, query?: Record<string
 }
 
 export function mapPage<R, M>(page: Paginated<R>, fn: (r: R) => M): Paginated<M> {
-  return { count: page.count, next: page.next, previous: page.previous, results: (page.results ?? []).map(fn) };
+  return { ...page, results: pageResults(page).map(fn) };
+}
+
+function pageResults<T>(page: { results: T[] }): T[] {
+  if (!page || !Array.isArray(page.results)) throw new TypeError("Expected a page with a results array");
+  return page.results;
 }
 
 export async function collect<T>(gen: AsyncGenerator<T>, limit = Infinity): Promise<T[]> {

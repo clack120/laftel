@@ -6,8 +6,10 @@ type Enumerate<N extends number, Acc extends number[] = []> = Acc["length"] exte
 export type IntRange<From extends number, To extends number> = Exclude<Enumerate<To>, Enumerate<From>>;
 
 export type Paginated<T> = {
+  /** Omitted by some endpoints; absence does not mean zero. */
   count?: number;
   next: string | null;
   previous?: string | null;
   results: T[];
+  [key: string]: unknown;
 };

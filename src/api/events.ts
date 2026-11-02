@@ -8,6 +8,7 @@ import type { RawComment, RawEvent, RawEventDraw } from "../raw.ts";
 export type EventCommentSort = LiteralUnion<"latest">;
 
 export interface Event {
+  readonly raw: RawEvent;
   id?: number;
   name?: string;
   type?: string;
@@ -17,10 +18,14 @@ export interface Event {
   status?: string;
   startsAt: Date | null;
   endsAt: Date | null;
+  contents?: RawEvent["contents"];
+  destination?: RawEvent["destination"];
+  commentsVisible?: boolean;
 }
 
 function toEvent(r: RawEvent): Event {
   return {
+    raw: r,
     id: r.id,
     name: r.name,
     type: r.type,
@@ -30,6 +35,9 @@ function toEvent(r: RawEvent): Event {
     status: r.status,
     startsAt: kst(r.start_datetime),
     endsAt: kst(r.end_datetime),
+    contents: r.contents,
+    destination: r.destination,
+    commentsVisible: r.is_comment_visible,
   };
 }
 
@@ -74,6 +82,7 @@ export class Events {
     return mapPage(page, toEvent);
   }
 
+  /** v2 event detail, including body blocks and navigation destination. */
   async get(id: number, opts: ApiOptions = {}): Promise<Event> {
     return toEvent(
       await this.http.get<RawEvent>(`events/v2/${id}/`, { ...opts, anon: opts.anon ?? this.http.anon ?? true }),

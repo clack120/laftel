@@ -10,9 +10,17 @@ export interface Avatar {
 }
 
 export interface AvatarCategory {
+  readonly raw: RawAvatarCategory;
   id: number;
   name: string;
   images: Avatar[];
+}
+
+export interface RawAvatarCategory {
+  category_id: number;
+  category_name: string;
+  images: Avatar[];
+  [key: string]: unknown;
 }
 
 export interface ProfileToken {
@@ -59,6 +67,7 @@ export class Profiles {
     return new Profile(await this.http.get<RawProfile>(`profiles/v2/${id}/`));
   }
 
+  /** A listed profile may still be unavailable to this token endpoint; API errors are propagated. */
   async token(id: number): Promise<ProfileToken> {
     const r = await this.http.get<{ id: number; user_id: number; token: string }>(`profiles/v1/${id}/token/`);
     return { profileId: r.id, userId: r.user_id, token: r.token };
@@ -105,7 +114,7 @@ export class Profiles {
     };
   }
 
-  // 장르 하나를 숨김/해제 토글. hidden=true면 숨김 목록에 추가. 갱신된 숨김 목록을 반환.
+  /** 장르 하나를 숨김/해제 토글. hidden=true면 숨김 목록에 추가. 갱신된 숨김 목록을 반환. */
   async setHiddenGenre(id: number, genreId: number, hidden: boolean): Promise<{ id: number; name: string }[]> {
     const r = await this.http.patch<{ hidden_genres: { id: number; name: string }[] }>(
       `profiles/v1/${id}/hidden_genres/`,
@@ -122,15 +131,17 @@ export class Profiles {
     return this.http.post(`profiles/v1/${id}/password/`, { body: { password } });
   }
 
+  /** Flat v1 avatar page; category membership is only returned by avatarCategories(). */
   avatars(opts: ApiOptions = {}): Promise<Paginated<Avatar>> {
     return this.http.get("profiles/v1/images/", { ...opts, anon: opts.anon ?? this.http.anon ?? true });
   }
 
+  /** Grouped v2 avatars; its envelope is not the v1 paginated shape. */
   async avatarCategories(opts: ApiOptions = {}): Promise<AvatarCategory[]> {
-    const r = await this.http.get<{ results?: { category_id: number; category_name: string; images: Avatar[] }[] }>(
+    const r = await this.http.get<{ results: RawAvatarCategory[] }>(
       "profiles/v2/images/",
       { ...opts, anon: opts.anon ?? this.http.anon ?? true },
     );
-    return (r.results ?? []).map((c) => ({ id: c.category_id, name: c.category_name, images: c.images }));
+    return r.results.map((c) => ({ raw: c, id: c.category_id, name: c.category_name, images: c.images }));
   }
 }

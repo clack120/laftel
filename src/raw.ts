@@ -15,6 +15,16 @@ export type AgeRating = LiteralUnion<0 | 7 | 12 | 15 | 19, number>;
  */
 export type AccessType = LiteralUnion<"free" | "svod" | "avod" | "buy" | "rent"> | null;
 
+export interface RawVideoPermission {
+  episode_id: number;
+  access_type: AccessType;
+  in_app_download: boolean;
+  membership_end_datetime: string | null;
+  item_expire_datetime: string | null;
+  access_info_list?: unknown[];
+  [key: string]: unknown;
+}
+
 export interface RawImage {
   option_name?: LiteralUnion<"home_default" | "home_custom">;
   img_url?: string;
@@ -33,6 +43,7 @@ export interface RawRating {
   classification_number?: string;
   broadcast_channel_name?: string;
   broadcast_date?: string | null;
+  business_name?: string;
   rating_components?: RatingComponent[];
 }
 
@@ -71,6 +82,8 @@ export interface RawItem {
   air_year_quarter: string | null;
   copyright: string;
   notice: string;
+  notices?: unknown[];
+  lounge?: unknown;
   production: string | null;
   series_id: number | null;
   expire_datetime: string | null;
@@ -102,7 +115,8 @@ export interface RawItem {
 export interface RawItemCard {
   id: number;
   name?: string;
-  img?: string;
+  img?: string | null;
+  img_url?: string;
   cropped_img?: string;
   home_img?: string;
   home_cropped_img?: string;
@@ -111,6 +125,7 @@ export interface RawItemCard {
   rating?: number | RawRating;
   rating_type?: RatingType | null;
   genres?: Genre[];
+  genre_tag_list?: Genre[];
   tag?: { name: string; type?: string }[];
   animation_info?: {
     medium?: Medium;
@@ -131,6 +146,7 @@ export interface RawItemCard {
   is_uncensored?: boolean;
   is_dubbed?: boolean;
   is_viewing?: boolean;
+  is_viewable?: boolean;
   is_laftel_only?: boolean;
   is_laftel_original?: boolean;
   is_exclusive?: boolean;
@@ -140,7 +156,27 @@ export interface RawItemCard {
   is_expired?: boolean;
 }
 
-export type RawItemLike = RawItem | RawItemCard;
+/** Legacy v2 detail; credits, UID and release flags are absent, unlike v4. */
+export interface RawItemV2 extends RawItemCard {
+  content?: string | null;
+  notice?: string;
+  awards?: string[];
+  tags?: Tag[];
+  avg_rating?: number;
+  is_svod?: boolean;
+  expire_datetime?: string | null;
+  author?: unknown[];
+  illustrator?: unknown[];
+  copyright?: string;
+  air_year_quarter?: string | null;
+  production?: string | null;
+  series_id?: number | null;
+  cnt_short_review?: number;
+  is_wish?: boolean;
+  is_hate?: boolean;
+}
+
+export type RawItemLike = RawItem | RawItemV2 | RawItemCard;
 
 export interface RawItemUserState {
   continue_episode_id: number | null;
@@ -226,13 +262,21 @@ export interface RawPublicStreamingInfo {
   subtitle_preview_url?: string | null;
 }
 
+export interface RawStreamProduct {
+  product_no: string;
+  name: string;
+  is_rental: boolean;
+  price: number;
+  [key: string]: unknown;
+}
+
 export interface RawStreamInfo {
   is_cartoon_network?: boolean;
   playback_info?: RawPlaybackInfo;
-  products_info?: { point?: number; products?: RawEpisodeProduct[] };
+  products_info?: { point?: number; products?: RawStreamProduct[] };
   protected_streaming_info?: RawProtectedStreamingInfo | null;
   public_streaming_info?: RawPublicStreamingInfo | null;
-  play_log_id?: number;
+  play_log_id?: number | null;
   next_episode?: { id?: number; episode_num?: string } | null;
 }
 
@@ -326,14 +370,32 @@ export interface RawAuth {
   is_registered: boolean;
 }
 
+export interface RawAppVersion {
+  current?: string;
+  required?: string;
+  required_build_number?: number;
+}
+
 export interface RawStatus {
   status?: LiteralUnion<"online" | "maintenance">;
   ip?: string;
   country_code?: string;
-  ios_version?: { current?: string; required?: string; required_build_number?: number };
-  android_version?: { current?: string; required?: string; required_build_number?: number };
+  ios_version?: RawAppVersion;
+  android_version?: RawAppVersion;
+  tizen_version?: RawAppVersion;
+  webos_version?: RawAppVersion;
+  tvos_version?: RawAppVersion;
+  androidtv_version?: RawAppVersion;
+  android_app_version?: number;
+  ios_app_version?: number;
   local_ad?: boolean;
   env?: LiteralUnion<"production" | "staging">;
+}
+
+export interface RawCarouselVideo {
+  hls_url?: string;
+  dash_url?: string;
+  [key: string]: unknown;
 }
 
 export interface RawCarousel {
@@ -348,21 +410,33 @@ export interface RawCarousel {
   item_destination?: number | null;
   event_destination?: number | null;
   external_destination?: string | null;
+  web_video?: RawCarouselVideo | null;
+  mobile_video?: RawCarouselVideo | null;
+  theme_destination?: unknown;
+  [key: string]: unknown;
 }
 
 export interface RawNotification {
   id?: number;
   type?: string;
   notification_type?: string;
-  status?: LiteralUnion<"read" | "unread">;
-  extra_data?: { type?: string; rating?: number; item_id?: number; episode_id?: number };
+  status?: LiteralUnion<"read" | "unread" | "unread_new">;
+  extra_data?: {
+    type?: string;
+    rating?: number;
+    item_id?: number;
+    episode_id?: number;
+    premiere_id?: number;
+    [key: string]: unknown;
+  };
   title?: string;
   description?: string;
   content?: string;
-  icon?: string;
-  image?: string;
+  icon?: string | null;
+  image?: string | null;
   created?: string;
   end_datetime?: string | null;
+  [key: string]: unknown;
 }
 
 export interface RawEvent {
@@ -376,6 +450,9 @@ export interface RawEvent {
   rating?: number;
   status?: string;
   contents?: { blocks?: unknown[] };
+  destination?: { type: string; value: string | number; label?: string; color?: string } | null;
+  is_comment_visible?: boolean;
+  [key: string]: unknown;
 }
 
 export interface RawLiveProgram {
@@ -506,6 +583,7 @@ export interface RawMembershipProduct {
   promotion?: unknown | null;
   provider?: string;
   is_active_renewable?: boolean;
+  [key: string]: unknown;
 }
 
 export interface RawMembership {
@@ -540,6 +618,8 @@ export interface RawBillingInfo {
 }
 
 export interface RawStoreProduct {
+  /** Legacy v1 search uses thumbnail, whereas v2 uses thumbnail_url. */
+  thumbnail?: string;
   product_id: number;
   product_no: number;
   product_code?: string;
@@ -579,6 +659,7 @@ export interface RawItemRequest {
 export interface RawPlayHistoryEntry extends RawItemCard {
   type?: string;
   genre?: Genre[];
+  last_play_episode?: { id: number; access_type: string | null } | null;
   last_played_episode_info?: {
     episode_id: number;
     episode_num: string;

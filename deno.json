@@ -1,6 +1,6 @@
 {
   "name": "@clack120/laftel",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "license": "Unlicense",
   "exports": {
     ".": "./src/mod.ts",

@@ -52,4 +52,7 @@ console.log({
 그 밖에 `items.series()`, `items.related()`, `reviews.list()`, `comments.list()`, `shorts.feed()`, `store.products.list()` 등으로 조회합니다.
 한국 IP에서만 제대로 동작합니다.
 
+API 버전은 상위 호환을 보장하지 않습니다. 메서드의 반환 타입과 JSDoc을 기준으로 선택하세요.  
+모델의 `raw`에는 수신한 원문 필드가 보존됩니다.  
+
 라이선스: [Unlicense](LICENSE). 아무런 보증 없이 제공됩니다.

@@ -36,7 +36,7 @@ export interface RawShort {
   linked_items: RawShortLinkedItem[];
   related_shorts_count: number;
   like_count: number;
-  play_count: number;
+  play_count: number | null;
   comment_count: number;
   is_liked: boolean;
   is_bookmarked: boolean;
@@ -97,7 +97,7 @@ export class Short {
   readonly linkedItems: readonly ShortLinkedItem[];
   readonly relatedCount: number;
   readonly likeCount: number;
-  readonly playCount: number;
+  readonly playCount: number | null;
   readonly commentCount: number;
   readonly liked: boolean;
   readonly bookmarked: boolean;
@@ -146,11 +146,13 @@ export class Short {
 export interface ShortFeedPage {
   next: string | null;
   results: Short[];
+  [key: string]: unknown;
 }
 
 export interface ShortCollection {
   placement: string;
   results: ShortCard[];
+  [key: string]: unknown;
 }
 
 export type ShortRequestOptions = ApiOptions;
@@ -189,10 +191,7 @@ const feedQuery = (opts: ShortFeedOptions) => ({
   anchor_shorts_id: opts.anchorShortsId,
 });
 
-const mapFeed = (page: { next: string | null; results?: RawShort[] }): ShortFeedPage => ({
-  next: page.next,
-  results: (page.results ?? []).map((raw) => new Short(raw)),
-});
+const mapFeed = (page: Paginated<RawShort>): ShortFeedPage => mapPage(page, (raw) => new Short(raw));
 
 export class Shorts {
   constructor(private http: Http) {}
@@ -212,7 +211,7 @@ export class Shorts {
   }
 
   async feed(opts: ShortFeedOptions = {}): Promise<ShortFeedPage> {
-    const page = await this.read<{ next: string | null; results?: RawShort[] }>("shorts/v1/feed/", {
+    const page = await this.read<Paginated<RawShort>>("shorts/v1/feed/", {
       query: feedQuery(opts),
       anon: opts.anon,
       signal: opts.signal,
@@ -231,7 +230,7 @@ export class Shorts {
       if (seen.has(cursor)) throw new Error("shorts feed repeated a pagination cursor");
       seen.add(cursor);
       page = mapFeed(
-        await this.read<{ next: string | null; results?: RawShort[] }>(cursor, {
+        await this.read<Paginated<RawShort>>(cursor, {
           anon: opts.anon,
           signal: opts.signal,
         }),
@@ -276,15 +275,14 @@ export class Shorts {
     return rows.map((raw) => new ShortCard(raw));
   }
 
+  /** v2 adds placement and an envelope; its selected IDs can differ from v1 collections(). */
   async collectionsV2(opts: ShortRequestOptions & { limit?: number } = {}): Promise<ShortCollection> {
-    const collection = await this.read<{ placement: string; results?: RawShortCard[] }>(
+    const collection = await this.read<{ placement: string; results: RawShortCard[] }>(
       "shorts/v2/collections/",
       { query: { limit: opts.limit }, anon: opts.anon, signal: opts.signal },
     );
-    return {
-      placement: collection.placement,
-      results: (collection.results ?? []).map((raw) => new ShortCard(raw)),
-    };
+    if (!Array.isArray(collection?.results)) throw new TypeError("Expected a collection with a results array");
+    return { ...collection, results: collection.results.map((raw) => new ShortCard(raw)) };
   }
 
   bookmark(shortsId: number): Promise<void> {

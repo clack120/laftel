@@ -41,11 +41,18 @@ export interface LaftelConfig {
 }
 
 export interface Status {
+  readonly raw: RawStatus;
   status?: string;
   ip?: string;
   countryCode?: string;
   localAd?: boolean;
   env?: string;
+  androidVersion?: RawStatus["android_version"];
+  iosVersion?: RawStatus["ios_version"];
+  tizenVersion?: RawStatus["tizen_version"];
+  webosVersion?: RawStatus["webos_version"];
+  tvosVersion?: RawStatus["tvos_version"];
+  androidTvVersion?: RawStatus["androidtv_version"];
 }
 
 export interface LoginResult {
@@ -175,7 +182,20 @@ export class Laftel {
 
   async status(opts: ApiOptions = {}): Promise<Status> {
     const r = await this.api.get<RawStatus>("v1.0/status/", { ...opts, anon: opts.anon ?? this.api.anon ?? true });
-    return { status: r.status, ip: r.ip, countryCode: r.country_code, localAd: r.local_ad, env: r.env };
+    return {
+      raw: r,
+      status: r.status,
+      ip: r.ip,
+      countryCode: r.country_code,
+      localAd: r.local_ad,
+      env: r.env,
+      androidVersion: r.android_version,
+      iosVersion: r.ios_version,
+      tizenVersion: r.tizen_version,
+      webosVersion: r.webos_version,
+      tvosVersion: r.tvos_version,
+      androidTvVersion: r.androidtv_version,
+    };
   }
 
   paginate<T>(
