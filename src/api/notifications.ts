@@ -1,4 +1,4 @@
-import type { Http } from "../http.ts";
+import type { ApiOptions, Http } from "../http.ts";
 import { mapPage } from "../paginate.ts";
 import { kst } from "../normalize.ts";
 import type { LiteralUnion, Paginated } from "../types.ts";
@@ -40,16 +40,18 @@ export class Notifications {
   constructor(private http: Http) {}
 
   async list(
-    opts: { limit?: number; notificationType?: string; offset?: number } = {},
+    opts: ApiOptions & { limit?: number; notificationType?: string; offset?: number } = {},
   ): Promise<Paginated<Notification>> {
     const page = await this.http.get<Paginated<RawNotification>>("notifications/v2/list/", {
       query: { limit: opts.limit, notification_type: opts.notificationType, offset: opts.offset },
+      anon: opts.anon,
+      signal: opts.signal,
     });
     return mapPage(page, toNotification);
   }
 
-  async count(): Promise<number> {
-    const res = await this.http.get<{ new_notification_history_count: number }>("notifications/v1/count/");
+  async count(opts: ApiOptions = {}): Promise<number> {
+    const res = await this.http.get<{ new_notification_history_count: number }>("notifications/v1/count/", opts);
     return res.new_notification_history_count;
   }
 

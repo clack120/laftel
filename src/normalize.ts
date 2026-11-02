@@ -7,7 +7,8 @@ export function text(s: string | null | undefined): string | undefined {
 export function kst(s: string | null | undefined): Date | null {
   if (!s) return null;
   const iso = s.length > 10 && s[10] === " " ? s.slice(0, 10) + "T" + s.slice(11) : s;
-  const stamped = hasZone(iso) ? iso : iso + "+09:00";
+  const time = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso + "T00:00:00" : iso;
+  const stamped = hasZone(time) ? time : time + "+09:00";
   const d = new Date(stamped);
   return isNaN(d.getTime()) ? null : d;
 }

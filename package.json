@@ -1,6 +1,7 @@
 {
   "name": "@clack120/laftel",
-  "version": "0.2.0",
+  "description": "비공식 라프텔 TypeScript SDK",
+  "version": "0.2.1",
   "type": "module",
   "exports": {
     ".": {
@@ -17,15 +18,15 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "sideEffects": false,
   "scripts": {
-    "build": "node scripts/build-package.mjs npm",
-    "build:jsr": "node scripts/build-package.mjs jsr",
-    "publish:jsr": "npm run build:jsr && cd build/jsr && deno publish --allow-dirty",
-    "check": "deno check src/mod.ts src/drm.ts src/payments.ts",
-    "gen:constants": "deno run --allow-net --allow-write=src scripts/gen-constants.ts"
+    "build": "node scripts/build.mjs",
+    "check": "tsc --noEmit",
+    "gen:constants": "npm run build && node scripts/gen-constants.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

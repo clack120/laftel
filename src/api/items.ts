@@ -1,4 +1,4 @@
-import type { Http } from "../http.ts";
+import type { ApiOptions, Http } from "../http.ts";
 import { mapPage } from "../paginate.ts";
 import { Item } from "../models.ts";
 import { kst } from "../normalize.ts";
@@ -13,7 +13,7 @@ import type {
 } from "../raw.ts";
 import { type PlayHistoryEntry, toPlayHistory } from "./users.ts";
 
-export interface PageOptions {
+export interface PageOptions extends ApiOptions {
   offset?: number;
   limit?: number;
 }
@@ -77,16 +77,29 @@ const toItemRequest = (r: RawItemRequest): ItemRequest => ({
 export class Items {
   constructor(private http: Http) {}
 
-  async get(id: number): Promise<Item> {
-    return new Item(await this.http.get<RawItem>(`items/v4/${id}/`, { anon: true }));
+  async get(id: number, opts: ApiOptions = {}): Promise<Item> {
+    return new Item(
+      await this.http.get<RawItem>(`items/v4/${id}/`, {
+        anon: opts.anon ?? this.http.anon ?? true,
+        signal: opts.signal,
+      }),
+    );
   }
 
-  async getV2(id: number): Promise<Item> {
-    return new Item(await this.http.get<RawItemCard>(`items/v2/${id}/`, { anon: true }));
+  async getV2(id: number, opts: ApiOptions = {}): Promise<Item> {
+    return new Item(
+      await this.http.get<RawItemCard>(`items/v2/${id}/`, {
+        anon: opts.anon ?? this.http.anon ?? true,
+        signal: opts.signal,
+      }),
+    );
   }
 
-  async statistics(id: number): Promise<ItemStatistics> {
-    const r = await this.http.get<RawItemStatistics>(`items/v1/${id}/statistics/`, { anon: true });
+  async statistics(id: number, opts: ApiOptions = {}): Promise<ItemStatistics> {
+    const r = await this.http.get<RawItemStatistics>(`items/v1/${id}/statistics/`, {
+      anon: opts.anon ?? this.http.anon ?? true,
+      signal: opts.signal,
+    });
     return {
       averageScore: Number(r.average_score),
       ratingCount: r.count_score,
@@ -105,24 +118,38 @@ export class Items {
     };
   }
 
+  /** An item's seriesId can refer here even when upstream omits it from these results. */
   async series(seriesId: number, opts: PageOptions = {}): Promise<Paginated<Item>> {
     const page = await this.http.get<Paginated<RawItemCard>>(`items/v2/series/${seriesId}/`, {
-      query: { ...opts },
-      anon: true,
+      query: { offset: opts.offset, limit: opts.limit },
+      anon: opts.anon ?? this.http.anon ?? true,
+      signal: opts.signal,
     });
     return mapPage(page, (r) => new Item(r));
   }
 
   async related(id: number, opts: PageOptions = {}): Promise<Paginated<Item>> {
     const page = await this.http.get<Paginated<RawItemCard>>(`items/v2/${id}/related/`, {
-      query: { ...opts },
-      anon: true,
+      query: { offset: opts.offset, limit: opts.limit },
+      anon: opts.anon ?? this.http.anon ?? true,
+      signal: opts.signal,
     });
     return mapPage(page, (r) => new Item(r));
   }
 
-  async hot(): Promise<Paginated<Item>> {
-    const page = await this.http.get<Paginated<RawItemCard>>("items/v1/hot/", { anon: true });
+  allRelated(id: number, opts: ApiOptions = {}): Promise<unknown> {
+    if (!Number.isSafeInteger(id) || id <= 0) throw new TypeError("item ID must be a positive safe integer");
+    return this.http.get(`items/v1/${id}/all_related/`, {
+      anon: opts.anon ?? this.http.anon ?? true,
+      signal: opts.signal,
+    });
+  }
+
+  async hot(opts: ApiOptions = {}): Promise<Paginated<Item>> {
+    const page = await this.http.get<Paginated<RawItemCard>>("items/v1/hot/", {
+      ...opts,
+      anon: opts.anon ?? this.http.anon ?? true,
+    });
     return mapPage(page, (r) => new Item(r));
   }
 
@@ -130,14 +157,17 @@ export class Items {
   async finished(opts: PageOptions & { sort?: FinishedSort } = {}): Promise<Paginated<Item>> {
     const page = await this.http.get<Paginated<RawItemCard>>("items/v1/finished/", {
       query: { offset: opts.offset, limit: opts.limit, sorting: opts.sort },
+      anon: opts.anon,
+      signal: opts.signal,
     });
     return mapPage(page, (r) => new Item(r));
   }
 
-  async purchasable(itemId: number): Promise<Purchasability> {
+  async purchasable(itemId: number, opts: ApiOptions = {}): Promise<Purchasability> {
     const r = await this.http.get<{ purchasable?: boolean; purchase_type?: string }>("items/v1/purchasable/", {
       query: { item_id: itemId },
-      anon: true,
+      signal: opts.signal,
+      anon: opts.anon ?? this.http.anon ?? true,
     });
     return { purchasable: r.purchasable, purchaseType: r.purchase_type };
   }
@@ -147,9 +177,13 @@ export class Items {
     return { continueEpisodeId: r.continue_episode_id, wished: r.is_wish, hated: r.is_hate };
   }
 
-  async wishItems(opts: { sort?: WishSort; offset?: number } = {}): Promise<Paginated<WishedItem>> {
+  async wishItems(
+    opts: ApiOptions & { sort?: WishSort; offset?: number; limit?: number } = {},
+  ): Promise<Paginated<WishedItem>> {
     const page = await this.http.get<Paginated<{ id: number; item: RawItemCard }>>("items/v1/wish_item/", {
-      query: { sorting: opts.sort, offset: opts.offset },
+      query: { sorting: opts.sort, offset: opts.offset, limit: opts.limit },
+      anon: opts.anon,
+      signal: opts.signal,
     });
     return mapPage(page, (r) => Object.assign(new Item(r.item), { wishId: r.id }));
   }

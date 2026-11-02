@@ -1,4 +1,4 @@
-import type { Http } from "../http.ts";
+import type { ApiOptions, Http } from "../http.ts";
 import { LiveChannel, LiveProgram } from "../models.ts";
 import { kst } from "../normalize.ts";
 import type { RawLiveChannel, RawLiveProgram } from "../raw.ts";
@@ -11,16 +11,20 @@ export interface Reminder {
 export class Live {
   constructor(private http: Http) {}
 
-  async channels(): Promise<LiveChannel[]> {
-    const list = await this.http.get<RawLiveChannel[]>("live/v1/channels/", { anon: true });
+  async channels(opts: ApiOptions = {}): Promise<LiveChannel[]> {
+    const list = await this.http.get<RawLiveChannel[]>("live/v1/channels/", {
+      ...opts,
+      anon: opts.anon ?? this.http.anon ?? true,
+    });
     return list.map((r) => new LiveChannel(r));
   }
 
   /** 편성표를 가져옵니다. */
-  async schedule(channelName: string, start: string, end: string): Promise<LiveProgram[]> {
+  async schedule(channelName: string, start: string, end: string, opts: ApiOptions = {}): Promise<LiveProgram[]> {
     const list = await this.http.get<RawLiveProgram[]>("live/v1/programs/", {
       query: { channel_name: channelName, start, end },
-      anon: true,
+      anon: opts.anon ?? this.http.anon ?? true,
+      signal: opts.signal,
     });
     return list.map((r) => new LiveProgram(r));
   }

@@ -1,4 +1,4 @@
-import type { Http } from "../http.ts";
+import type { ApiOptions, Http } from "../http.ts";
 import { type AccountInfo, Profile, type ProfileStatistics, toAccount, toProfileStatistics } from "../models.ts";
 import type { Paginated } from "../types.ts";
 import type { RawAccount, RawProfile, RawProfileStatistics } from "../raw.ts";
@@ -122,14 +122,14 @@ export class Profiles {
     return this.http.post(`profiles/v1/${id}/password/`, { body: { password } });
   }
 
-  avatars(): Promise<Paginated<Avatar>> {
-    return this.http.get("profiles/v1/images/", { anon: true });
+  avatars(opts: ApiOptions = {}): Promise<Paginated<Avatar>> {
+    return this.http.get("profiles/v1/images/", { ...opts, anon: opts.anon ?? this.http.anon ?? true });
   }
 
-  async avatarCategories(): Promise<AvatarCategory[]> {
+  async avatarCategories(opts: ApiOptions = {}): Promise<AvatarCategory[]> {
     const r = await this.http.get<{ results?: { category_id: number; category_name: string; images: Avatar[] }[] }>(
       "profiles/v2/images/",
-      { anon: true },
+      { ...opts, anon: opts.anon ?? this.http.anon ?? true },
     );
     return (r.results ?? []).map((c) => ({ id: c.category_id, name: c.category_name, images: c.images }));
   }

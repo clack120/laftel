@@ -1,4 +1,4 @@
-import type { Http } from "../http.ts";
+import type { ApiOptions, Http } from "../http.ts";
 import { mapPage } from "../paginate.ts";
 import { Item } from "../models.ts";
 import type { LiteralUnion, Paginated } from "../types.ts";
@@ -15,7 +15,7 @@ export interface Filter<T> {
   exclude?: T[];
 }
 
-export interface DiscoverOptions {
+export interface DiscoverOptions extends ApiOptions {
   sort?: DiscoverSort;
   genres?: Filter<Genre>;
   tags?: Filter<Tag>;
@@ -26,7 +26,6 @@ export interface DiscoverOptions {
   viewable?: boolean;
   offset?: number;
   limit?: number;
-  signal?: AbortSignal;
 }
 
 export class Search {
@@ -48,35 +47,35 @@ export class Search {
         offset: opts.offset,
         size: opts.limit,
       },
-      anon: true,
+      anon: opts.anon ?? this.http.anon ?? true,
       signal: opts.signal,
     });
     return mapPage(page, (r) => new Item(r));
   }
 
-  autocomplete(keyword: string, opts: { signal?: AbortSignal } = {}): Promise<string[]> {
+  autocomplete(keyword: string, opts: ApiOptions = {}): Promise<string[]> {
     return this.http.get<string[]>("search/v1/auto_complete/", {
       query: { keyword },
-      anon: true,
+      anon: opts.anon ?? this.http.anon ?? true,
       signal: opts.signal,
     });
   }
 
   async keyword(
     keyword: string,
-    opts: { viewable?: boolean; offset?: number; limit?: number; signal?: AbortSignal } = {},
+    opts: ApiOptions & { viewable?: boolean; offset?: number; limit?: number } = {},
   ): Promise<Paginated<Item>> {
     const page = await this.http.get<Paginated<RawItemCard>>("search/v3/keyword/", {
       query: { keyword, viewing_only: opts.viewable, offset: opts.offset, size: opts.limit },
-      anon: true,
+      anon: opts.anon ?? this.http.anon ?? true,
       signal: opts.signal,
     });
     return mapPage(page, (r) => new Item(r));
   }
 
-  async dailyNewReleases(opts: { signal?: AbortSignal } = {}): Promise<Item[]> {
+  async dailyNewReleases(opts: ApiOptions = {}): Promise<Item[]> {
     const list = await this.http.get<RawItemCard[]>("search/v2/daily/", {
-      anon: true,
+      anon: opts.anon ?? this.http.anon ?? true,
       signal: opts.signal,
     });
     return list.map((r) => new Item(r));

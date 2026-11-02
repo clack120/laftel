@@ -1,4 +1,4 @@
-import type { Http } from "../http.ts";
+import type { ApiOptions, Http } from "../http.ts";
 import { kst, text } from "../normalize.ts";
 import type { RawNotice } from "../raw.ts";
 import type { LiteralUnion } from "../types.ts";
@@ -32,14 +32,17 @@ export interface Notice {
 export class Misc {
   constructor(private http: Http) {}
 
-  async currentNotice(): Promise<Notice | null> {
-    const r = await this.http.get<RawNotice | null>("notices/v1/current/", { anon: true });
+  async currentNotice(opts: ApiOptions = {}): Promise<Notice | null> {
+    const r = await this.http.get<RawNotice | null>("notices/v1/current/", {
+      ...opts,
+      anon: opts.anon ?? this.http.anon ?? true,
+    });
     if (!r) return null;
     return { id: r.id, title: text(r.title), articleUrl: r.zendesk_url, publishedAt: kst(r.published_datetime) };
   }
 
-  scheduleNotice(): Promise<unknown> {
-    return this.http.get("v1.0/lists/schedule_notice/", { anon: true });
+  scheduleNotice(opts: ApiOptions = {}): Promise<unknown> {
+    return this.http.get("v1.0/lists/schedule_notice/", { ...opts, anon: opts.anon ?? this.http.anon ?? true });
   }
 
   npsSurveys(): Promise<unknown> {
@@ -89,17 +92,17 @@ export class Misc {
     return { hasMainProfile: !!r.has_main_profile, hasPermission: !!r.has_permission };
   }
 
-  infoDiscover(): Promise<
+  infoDiscover(opts: ApiOptions = {}): Promise<
     { genres?: string[]; tags?: string[]; brands?: string[]; productions?: string[]; years?: { animation?: string[] } }
   > {
-    return this.http.get("v1.0/info/discover/", { anon: true });
+    return this.http.get("v1.0/info/discover/", { ...opts, anon: opts.anon ?? this.http.anon ?? true });
   }
 
   /** 댓글 필터용 금지어 사전(전역). 자동으로 필터되지 않고 직접 교체해야함 */
-  async bannedWords(): Promise<{ words: string[]; replacement?: string }> {
+  async bannedWords(opts: ApiOptions = {}): Promise<{ words: string[]; replacement?: string }> {
     const r = await this.http.get<{ banned_word_list?: string[]; replacement_word?: string }>(
       "users/v1/banned_words/",
-      { anon: true },
+      { ...opts, anon: opts.anon ?? this.http.anon ?? true },
     );
     return { words: r.banned_word_list ?? [], replacement: r.replacement_word };
   }

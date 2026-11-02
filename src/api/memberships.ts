@@ -1,4 +1,4 @@
-import type { Http } from "../http.ts";
+import type { ApiOptions, Http } from "../http.ts";
 import { type BillingInfo, toBillingInfo } from "../models.ts";
 import { kst } from "../normalize.ts";
 import type { LiteralUnion } from "../types.ts";
@@ -30,6 +30,8 @@ export interface ScheduledMembership {
   billingInfo?: BillingInfo | null;
 }
 
+export type MembershipRequestOptions = ApiOptions;
+
 export const toMembershipProduct = (r: RawMembershipProduct): MembershipProduct => ({
   id: r.id,
   name: r.name,
@@ -51,13 +53,14 @@ export const toMembership = (r: RawMembership): Membership => ({
 export class Memberships {
   constructor(private http: Http) {}
 
-  async current(): Promise<Membership | null> {
-    const r = await this.http.get<RawMembership | null>("memberships/v1/current/");
+  /** HTTP 204 means no membership. */
+  async current(opts: MembershipRequestOptions = {}): Promise<Membership | null> {
+    const r = await this.http.get<RawMembership | null>("memberships/v1/current/", opts);
     return r ? toMembership(r) : null;
   }
 
-  async scheduled(): Promise<ScheduledMembership | null> {
-    const r = await this.http.get<RawReservedMembership | null>("memberships/v1/reserved/");
+  async scheduled(opts: MembershipRequestOptions = {}): Promise<ScheduledMembership | null> {
+    const r = await this.http.get<RawReservedMembership | null>("memberships/v1/reserved/", opts);
     if (!r) return null;
     return {
       status: r.status,
@@ -73,9 +76,10 @@ export class Memberships {
     }).then((r) => ({ upgradeAvailable: r.upgrade_available, days: r.days }));
   }
 
-  async products(): Promise<MembershipProduct[]> {
+  async products(opts: ApiOptions = {}): Promise<MembershipProduct[]> {
     const res = await this.http.get<{ products: RawMembershipProduct[] }>("products/v3/membership_products/", {
-      anon: true,
+      ...opts,
+      anon: opts.anon ?? this.http.anon ?? true,
     });
     return res.products.map(toMembershipProduct);
   }

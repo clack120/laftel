@@ -1,4 +1,4 @@
-import { type Debug, Http, type QueryValue, type Session } from "./http.ts";
+import { type ApiOptions, type Debug, Http, type QueryValue, type Session } from "./http.ts";
 import { paginate } from "./paginate.ts";
 import type { LiteralUnion, Paginated } from "./types.ts";
 import { type AccountInfo, toAccount } from "./models.ts";
@@ -15,6 +15,7 @@ import { Home } from "./api/home.ts";
 import { Notifications } from "./api/notifications.ts";
 import { Events } from "./api/events.ts";
 import { Live } from "./api/live.ts";
+import { Premieres } from "./api/premieres.ts";
 import { Memberships } from "./api/memberships.ts";
 import { Misc } from "./api/misc.ts";
 import { Account } from "./api/account.ts";
@@ -28,11 +29,11 @@ export const STORE_BASE = "https://store-api.laftel.net/";
 
 export interface LaftelConfig {
   token?: string | null;
+  anon?: boolean;
   baseUrl?: string;
   storeBaseUrl?: string;
   fetch?: typeof fetch;
   userAgent?: string;
-  googlebotFallback?: boolean;
   timeoutMs?: number;
   headers?: Record<string, string>;
   debug?: Debug;
@@ -50,7 +51,7 @@ export interface Status {
 export interface LoginResult {
   account: AccountInfo;
   token: string;
-  method: LiteralUnion<"email" | "google" | "kakao">;
+  method: LiteralUnion<"email" | "google" | "kakao" | "apple">;
   /** 휴면 해제되어 복구된 계정 */
   isRestored: boolean;
   /** 이번 로그인으로 신규 가입 처리됨 */
@@ -83,6 +84,7 @@ export class Laftel {
   readonly notifications: Notifications;
   readonly events: Events;
   readonly live: Live;
+  readonly premieres: Premieres;
   readonly memberships: Memberships;
   readonly misc: Misc;
   readonly account: Account;
@@ -95,9 +97,9 @@ export class Laftel {
     this.session = { token: config.token ?? null };
     const shared = {
       session: this.session,
+      anon: config.anon,
       fetch: config.fetch,
       userAgent: config.userAgent,
-      googlebotFallback: config.googlebotFallback,
       timeoutMs: config.timeoutMs,
       headers: config.headers,
       debug: config.debug,
@@ -116,6 +118,7 @@ export class Laftel {
     this.notifications = new Notifications(this.api);
     this.events = new Events(this.api);
     this.live = new Live(this.api);
+    this.premieres = new Premieres(this.api);
     this.memberships = new Memberships(this.api);
     this.misc = new Misc(this.api);
     this.account = new Account(this.api);
@@ -132,8 +135,12 @@ export class Laftel {
     this.session.token = value;
   }
 
-  async login(username: string, password: string): Promise<LoginResult> {
-    const res = await this.api.post<RawAuth>("authentications/v3/email/", { anon: true, body: { username, password } });
+  async login(username: string, password: string, opts: ApiOptions = {}): Promise<LoginResult> {
+    const res = await this.api.post<RawAuth>("authentications/v3/email/", {
+      ...opts,
+      anon: opts.anon ?? this.api.anon ?? true,
+      body: { username, password },
+    });
     this.session.token = res.key;
     return toLoginResult(res);
   }
@@ -141,8 +148,13 @@ export class Laftel {
   async loginSocial(
     provider: "kakao" | "apple" | "google",
     tokens: { access_token: string; id_token?: string },
+    opts: ApiOptions = {},
   ): Promise<LoginResult> {
-    const res = await this.api.post<RawAuth>(`authentications/v3/${provider}/`, { anon: true, body: tokens });
+    const res = await this.api.post<RawAuth>(`authentications/v3/${provider}/`, {
+      ...opts,
+      anon: opts.anon ?? this.api.anon ?? true,
+      body: tokens,
+    });
     this.session.token = res.key;
     return toLoginResult(res);
   }
@@ -161,16 +173,20 @@ export class Laftel {
     return res.token;
   }
 
-  async status(): Promise<Status> {
-    const r = await this.api.get<RawStatus>("v1.0/status/", { anon: true });
+  async status(opts: ApiOptions = {}): Promise<Status> {
+    const r = await this.api.get<RawStatus>("v1.0/status/", { ...opts, anon: opts.anon ?? this.api.anon ?? true });
     return { status: r.status, ip: r.ip, countryCode: r.country_code, localAd: r.local_ad, env: r.env };
   }
 
-  paginate<T>(path: string, query?: Record<string, QueryValue>): AsyncGenerator<T, void, unknown> {
-    return paginate<T>(this.api, path, { query });
+  paginate<T>(
+    path: string,
+    query?: Record<string, QueryValue>,
+    opts: ApiOptions = {},
+  ): AsyncGenerator<T, void, unknown> {
+    return paginate<T>(this.api, path, { ...opts, query });
   }
 
-  page<T>(path: string, query?: Record<string, QueryValue>): Promise<Paginated<T>> {
-    return this.api.get<Paginated<T>>(path, { query });
+  page<T>(path: string, query?: Record<string, QueryValue>, opts: ApiOptions = {}): Promise<Paginated<T>> {
+    return this.api.get<Paginated<T>>(path, { ...opts, query });
   }
 }

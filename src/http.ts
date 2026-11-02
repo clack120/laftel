@@ -1,5 +1,5 @@
 import { LaftelError, parseError } from "./errors.ts";
-import { GOOGLEBOT_USER_AGENT, USER_AGENT } from "./version.ts";
+import { USER_AGENT } from "./version.ts";
 
 function describe(e: unknown): string {
   const parts: string[] = [];
@@ -24,34 +24,50 @@ export interface Session {
   token: string | null;
 }
 
+/** Metadata only: credentials, query values and request/response bodies are omitted. */
 export type Debug = boolean | ((line: string) => void);
+
+function debugUrl(value: string): string {
+  const url = new URL(value);
+  url.username = "";
+  url.password = "";
+  url.pathname = url.pathname.replace(/(\/(?:premiere_)?sessions\/)[^/]+/g, "$1[redacted]");
+  for (const name of new Set(url.searchParams.keys())) url.searchParams.set(name, "[redacted]");
+  url.hash = "";
+  return url.href;
+}
 
 export interface HttpConfig {
   baseUrl: string;
   session: Session;
+  anon?: boolean;
   fetch?: typeof fetch;
   userAgent?: string;
-  googlebotFallback?: boolean;
   timeoutMs?: number;
   headers?: Record<string, string>;
   debug?: Debug;
 }
 
-export interface RequestOptions {
+export interface ApiOptions {
+  anon?: boolean;
+  signal?: AbortSignal;
+}
+
+export interface RequestOptions extends ApiOptions {
   query?: Record<string, QueryValue>;
   body?: unknown;
-  anon?: boolean;
   ok404?: boolean;
-  signal?: AbortSignal;
   headers?: Record<string, string>;
+  /** Follow HTTP redirects (default: true). */
+  followRedirects?: boolean;
 }
 
 export class Http {
   readonly baseUrl: string;
   readonly session: Session;
+  readonly anon?: boolean;
   private readonly fetchImpl: typeof fetch;
   private readonly userAgent: string;
-  private readonly googlebotFallback: boolean;
   private readonly timeoutMs: number;
   private readonly extraHeaders?: Record<string, string>;
   private readonly log?: (line: string) => void;
@@ -63,12 +79,11 @@ export class Http {
     }
     this.baseUrl = config.baseUrl;
     this.session = config.session;
-    this.fetchImpl = f;
+    this.anon = config.anon;
+    this.fetchImpl = f === globalThis.fetch ? f.bind(globalThis) : f;
     this.userAgent = config.userAgent ?? USER_AGENT;
     this.extraHeaders = config.headers;
     this.timeoutMs = config.timeoutMs ?? 20_000;
-    this.googlebotFallback = (config.googlebotFallback ?? false) && config.userAgent === undefined &&
-      !new Headers(config.headers).has("user-agent");
     const d = config.debug;
     this.log = typeof d === "function" ? d : d ? (line) => console.error(line) : undefined;
   }
@@ -100,7 +115,10 @@ export class Http {
     }
 
     const token = this.session.token;
-    if (token && !opts.anon) headers.set("Authorization", `Token ${token}`);
+    if ((opts.anon ?? this.anon) || !token) {
+      headers.delete("Authorization");
+      headers.delete("Cookie");
+    } else headers.set("Authorization", `Token ${token}`);
 
     let payload: string | undefined;
     if (opts.body !== undefined) {
@@ -110,21 +128,21 @@ export class Http {
 
     if (this.log) {
       this.log(
-        `laftel --> ${method} ${url}\n   headers ${JSON.stringify(Object.fromEntries(headers))}${
-          payload ? `\n   body ${payload}` : ""
-        }`,
+        `laftel --> ${method} ${debugUrl(url)}\n   header names ${
+          JSON.stringify([...this.wireHeaders(url, headers).keys()])
+        }${payload ? `\n   body (${payload.length} chars)` : ""}`,
       );
     }
 
     const { res, bodyText } = await this.send(method, url, headers, opts, payload);
-    if (this.log) this.log(`laftel <-- ${res.status} ${method} ${url}\n   ${bodyText || "(empty body)"}`);
+    if (this.log) this.log(`laftel <-- ${res.status} ${method} ${debugUrl(url)} (${bodyText.length} chars)`);
 
     if (!res.ok) {
       if (res.status === 404 && opts.ok404) {
-        if (this.log) this.log(`laftel skip 404 (ok404, null): ${url}`);
+        if (this.log) this.log(`laftel skip 404 (ok404, null): ${debugUrl(url)}`);
         return null as T;
       }
-      throw parseError(res.status, method, url, bodyText);
+      throw parseError(res.status, method, url, bodyText, undefined, res.headers.get("retry-after"));
     }
 
     if (!bodyText) return null as T;
@@ -151,18 +169,28 @@ export class Http {
       for (const [key, value] of Object.entries(source ?? {})) headers.set(key, value);
     }
     const token = this.session.token;
-    if (token && !opts.anon) headers.set("Authorization", `Token ${token}`);
+    if ((opts.anon ?? this.anon) || !token) {
+      headers.delete("Authorization");
+      headers.delete("Cookie");
+    } else headers.set("Authorization", `Token ${token}`);
 
-    if (this.log) this.log(`laftel --> GET(text) ${url}\n   headers ${JSON.stringify(Object.fromEntries(headers))}`);
+    if (this.log) {
+      this.log(
+        `laftel --> GET(text) ${debugUrl(url)}\n   header names ${
+          JSON.stringify([...this.wireHeaders(url, headers).keys()])
+        }`,
+      );
+    }
 
     const { res, bodyText } = await this.send("GET", url, headers, opts);
-    if (this.log) this.log(`laftel <-- ${res.status} GET(text) ${url} (${bodyText.length} bytes)`);
-    if (!res.ok) throw parseError(res.status, "GET", url, bodyText);
+    if (this.log) this.log(`laftel <-- ${res.status} GET(text) ${debugUrl(url)} (${bodyText.length} chars)`);
+    if (!res.ok) throw parseError(res.status, "GET", url, bodyText, undefined, res.headers.get("retry-after"));
     return bodyText;
   }
 
-  private resolve(path: string, query?: Record<string, QueryValue>): string {
+  resolve(path: string, query?: Record<string, QueryValue>): string {
     const url = new URL(path, this.baseUrl);
+    if (url.username || url.password) throw new TypeError("Request URLs must not contain credentials");
     const laftel = url.protocol === "https:" &&
       (url.hostname === "laftel.net" || url.hostname.endsWith(".laftel.net"));
     if (!laftel && url.origin !== new URL(this.baseUrl).origin) {
@@ -186,6 +214,24 @@ export class Http {
     return url.href;
   }
 
+  private apiTarget(value: string): boolean {
+    const origin = new URL(value).origin;
+    return origin === new URL(this.baseUrl).origin || origin === "https://api.laftel.net" ||
+      origin === "https://store-api.laftel.net";
+  }
+
+  private wireHeaders(value: string, headers: Headers): Headers {
+    const result = new Headers(headers);
+    if (this.apiTarget(value)) {
+      if (!result.has("Laftel")) result.set("Laftel", "TeJava");
+    } else {
+      result.delete("Laftel");
+      result.delete("Authorization");
+      result.delete("Cookie");
+    }
+    return result;
+  }
+
   private async send(
     method: string,
     url: string,
@@ -200,33 +246,29 @@ export class Http {
     let requestMethod = method;
     let requestBody = body;
     let redirects = 0;
-    let retried = false;
     try {
       while (true) {
+        signal.throwIfAborted();
         const res = await this.fetchImpl(target, {
           method: requestMethod,
-          headers,
+          headers: this.wireHeaders(target, headers),
+          credentials: this.apiTarget(target) && headers.has("Authorization") ? "same-origin" : "omit",
           body: requestBody,
           signal,
           redirect: "manual",
         });
-        if (
-          this.googlebotFallback && !retried && res.status === 403 &&
-          !new Headers(opts.headers).has("user-agent")
-        ) {
-          await res.text();
-          if (this.log) this.log(`laftel retry ${requestMethod} ${target} with Googlebot UA after 403`);
-          headers.set("User-Agent", GOOGLEBOT_USER_AGENT);
-          retried = true;
-          continue;
-        }
+        const bodyText = await res.text();
         const location = res.headers.get("location");
-        if (![301, 302, 303, 307, 308].includes(res.status) || !location) {
-          return { res, bodyText: await res.text() };
+        if (opts.followRedirects === false || ![301, 302, 303, 307, 308].includes(res.status) || !location) {
+          return { res, bodyText };
         }
-        await res.text();
         if (redirects++ === 20) throw new Error("Too many redirects");
-        target = this.resolve(new URL(location, target).href);
+        const next = this.resolve(new URL(location, target).href);
+        const crossOrigin = new URL(next).origin !== new URL(target).origin;
+        if (crossOrigin) {
+          headers.delete("Authorization");
+          headers.delete("Cookie");
+        }
         if (
           (res.status === 303 && requestMethod !== "HEAD") ||
           ((res.status === 301 || res.status === 302) && requestMethod === "POST")
@@ -236,15 +278,20 @@ export class Http {
           headers.delete("content-type");
           headers.delete("content-length");
         }
+        if (crossOrigin && requestBody !== undefined) throw new Error("Cross-origin request body redirect refused");
+        target = next;
       }
     } catch (cause) {
       const detail = describe(cause);
-      if (this.log) this.log(`laftel err ${method} ${url}\n   ${detail}`);
+      const code = opts.signal?.aborted ? "aborted" : timeout.signal.aborted ? "timeout" : "network";
+      if (this.log) {
+        this.log(`laftel err ${method} ${debugUrl(url)} (${code})`);
+      }
       throw new LaftelError({
         status: 0,
         method,
         url,
-        code: timeout.signal.aborted ? "timeout" : "network",
+        code,
         detail,
         bodyText: "",
         cause,

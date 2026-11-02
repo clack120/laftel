@@ -1,9 +1,25 @@
-import type { Http } from "../http.ts";
+import type { ApiOptions, Http } from "../http.ts";
 import { mapPage } from "../paginate.ts";
 import type { LiteralUnion, Paginated } from "../types.ts";
 import type { RawStoreProduct } from "../raw.ts";
 
 export type StoreSort = LiteralUnion<"LATEST" | "POPULAR">;
+
+export interface StoreProductListOptions extends ApiOptions {
+  /** Item.uid from the main API, not the numeric item ID. */
+  ottItemUid?: string;
+  classificationId?: number;
+  sort?: StoreSort;
+  offset?: number;
+  limit?: number;
+}
+
+export type StoreProductRequestOptions = ApiOptions;
+
+function positiveId(value: number): number {
+  if (!Number.isSafeInteger(value) || value <= 0) throw new TypeError("ID must be a positive safe integer");
+  return value;
+}
 
 export interface StoreClassificationRef {
   id: number;
@@ -98,7 +114,7 @@ export class StoreProducts {
   constructor(private http: Http) {}
 
   async list(
-    opts: { ottItemUid?: string; classificationId?: number; sort?: StoreSort; offset?: number; limit?: number } = {},
+    opts: StoreProductListOptions = {},
   ): Promise<Paginated<StoreProduct>> {
     const page = await this.http.get<Paginated<RawStoreProduct>>("v2.0/products/", {
       query: {
@@ -108,25 +124,55 @@ export class StoreProducts {
         offset: opts.offset,
         limit: opts.limit,
       },
-      anon: true,
+      anon: opts.anon ?? this.http.anon ?? true,
+      signal: opts.signal,
     });
     return mapPage(page, (r) => new StoreProduct(r));
   }
 
+  /** Goods linked by Item.uid. */
+  forItem(
+    ottItemUid: string,
+    opts: Omit<StoreProductListOptions, "ottItemUid"> = {},
+  ): Promise<Paginated<StoreProduct>> {
+    if (typeof ottItemUid !== "string" || !ottItemUid.trim()) throw new TypeError("item UID must not be empty");
+    return this.list({ ...opts, ottItemUid });
+  }
+
+  /** Legacy item-linked products. */
+  itemRelated(itemId: number, opts: StoreProductRequestOptions = {}): Promise<unknown> {
+    return this.http.get("v1.0/products/item_related/", {
+      query: { item_id: positiveId(itemId) },
+      anon: opts.anon ?? this.http.anon ?? true,
+      signal: opts.signal,
+    });
+  }
+
+  /** Products selected by product number. */
+  byNumbers(productNos: readonly number[], opts: StoreProductRequestOptions = {}): Promise<unknown> {
+    if (!Array.isArray(productNos) || productNos.length === 0) throw new TypeError("product numbers must not be empty");
+    return this.http.get("v1.0/products/", {
+      query: { product_nos: productNos.map(positiveId).join(",") },
+      anon: opts.anon ?? this.http.anon ?? true,
+      signal: opts.signal,
+    });
+  }
+
   async search(
     keyword: string,
-    opts: { sort?: StoreSort; offset?: number; limit?: number } = {},
+    opts: ApiOptions & { sort?: StoreSort; offset?: number; limit?: number } = {},
   ): Promise<Paginated<StoreProduct>> {
     const page = await this.http.get<Paginated<RawStoreProduct>>("v2.0/products/search/", {
       query: { keyword, sort_by: opts.sort, offset: opts.offset, limit: opts.limit },
-      anon: true,
+      anon: opts.anon ?? this.http.anon ?? true,
+      signal: opts.signal,
     });
     return mapPage(page, (r) => new StoreProduct(r));
   }
 
   // period는 필수(없으면 400). 실측상 daily/weekly만 유효.
   async popular(
-    opts: { period?: "daily" | "weekly"; classificationId?: number; limit?: number; top?: number } = {},
+    opts: ApiOptions & { period?: "daily" | "weekly"; classificationId?: number; limit?: number; top?: number } = {},
   ): Promise<Paginated<StoreProduct>> {
     const page = await this.http.get<Paginated<RawStoreProduct>>("v1.0/products/popular/", {
       query: {
@@ -135,31 +181,37 @@ export class StoreProducts {
         limit: opts.limit,
         top: opts.top,
       },
-      anon: true,
+      anon: opts.anon ?? this.http.anon ?? true,
+      signal: opts.signal,
     });
     return mapPage(page, (r) => new StoreProduct(r));
   }
 
-  async new(opts: { limit?: number } = {}): Promise<Paginated<StoreProduct>> {
+  async new(opts: ApiOptions & { limit?: number } = {}): Promise<Paginated<StoreProduct>> {
     const page = await this.http.get<Paginated<RawStoreProduct>>("v1.0/products/new/", {
-      query: { ...opts },
-      anon: true,
+      query: { limit: opts.limit },
+      anon: opts.anon ?? this.http.anon ?? true,
+      signal: opts.signal,
     });
     return mapPage(page, (r) => new StoreProduct(r));
   }
 
-  autocomplete(keyword: string, opts: { limit?: number } = {}): Promise<{ suggestions: string[] }> {
-    return this.http.get("v1.0/products/autocomplete/", { query: { keyword, ...opts }, anon: true });
+  autocomplete(keyword: string, opts: ApiOptions & { limit?: number } = {}): Promise<{ suggestions: string[] }> {
+    return this.http.get("v1.0/products/autocomplete/", {
+      query: { keyword, limit: opts.limit },
+      anon: opts.anon ?? this.http.anon ?? true,
+      signal: opts.signal,
+    });
   }
 
   purchaseAvailability(productNo: number): Promise<{ purchasable: boolean }> {
     return this.http.get(`v1.0/products/${productNo}/purchase_availability/`);
   }
 
-  async itemBanners(): Promise<StoreItemBanner[]> {
+  async itemBanners(opts: ApiOptions = {}): Promise<StoreItemBanner[]> {
     const response = await this.http.get<{ results?: { product_no: number; ott_item_id: number }[] }>(
       "v1.0/products/item_banners/",
-      { anon: true },
+      { ...opts, anon: opts.anon ?? this.http.anon ?? true },
     );
     return (response.results ?? []).map((banner) => ({
       productNo: banner.product_no,

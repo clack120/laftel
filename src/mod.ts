@@ -20,6 +20,7 @@ export * from "./api/home.ts";
 export * from "./api/notifications.ts";
 export * from "./api/events.ts";
 export * from "./api/live.ts";
+export * from "./api/premieres.ts";
 export * from "./api/memberships.ts";
 export * from "./api/misc.ts";
 export * from "./api/account.ts";

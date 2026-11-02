@@ -1,4 +1,4 @@
-import type { Http } from "../http.ts";
+import type { ApiOptions, Http } from "../http.ts";
 import { LaftelError } from "../errors.ts";
 
 export class Account {
@@ -35,9 +35,13 @@ export class Account {
   }
 
   /** 이메일 가입 가능 여부. 이미 쓰는 이메일이면 false, 아니면 true. */
-  async emailAvailable(email: string): Promise<boolean> {
+  async emailAvailable(email: string, opts: ApiOptions = {}): Promise<boolean> {
     try {
-      await this.http.get("emails/v2/signup_check/", { query: { email }, anon: true });
+      await this.http.get("emails/v2/signup_check/", {
+        ...opts,
+        query: { email },
+        anon: opts.anon ?? this.http.anon ?? true,
+      });
       return true;
     } catch (e) {
       if (e instanceof LaftelError && e.code === "EMAIL_ALREADY_IN_USE") return false;
@@ -51,9 +55,11 @@ export class Account {
    */
   signup(
     input: { email: string; authCode: string; password: string },
+    opts: ApiOptions = {},
   ): Promise<{ content?: { key?: string }; is_restored?: boolean }> {
     return this.http.post("v1.0/signup/email/", {
-      anon: true,
+      ...opts,
+      anon: opts.anon ?? this.http.anon ?? true,
       body: { email: input.email, auth_code: input.authCode, password1: input.password, password2: input.password },
     });
   }

@@ -57,7 +57,7 @@ export class Playback {
   }
 
   session(uuid: string, status: LiteralUnion<"playing" | "paused" | "stopped">): Promise<void> {
-    return this.http.post(`playbacks/v1/sessions/${uuid}/`, { body: { status } });
+    return this.http.post(`playbacks/v1/sessions/${encodeURIComponent(uuid)}/`, { body: { status } });
   }
 
   async live(channelName: string): Promise<LivePlayback> {

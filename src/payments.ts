@@ -651,7 +651,7 @@ export function updateOrderSheet(
   uid: string,
   receiver: StoreReceiver,
 ): Promise<StoreOrderSheet> {
-  return client.storeHttp.patch<StoreOrderSheet>(`v1.0/order_sheets/${uid}/`, {
+  return client.storeHttp.patch<StoreOrderSheet>(`v1.0/order_sheets/${encodeURIComponent(uid)}/`, {
     body: { receiver: toRawReceiver(receiver) },
   });
 }
@@ -661,9 +661,12 @@ export async function readyOrderPayment(
   uid: string,
   input: { pgType?: LiteralUnion<"nicepay">; orderSheet: StoreOrderSheet },
 ): Promise<NicepayReady> {
-  const response = await client.storeHttp.post<RawNicepayReady>(`v1.0/order_sheets/${uid}/payment/ready/`, {
-    body: { pg_type: input.pgType ?? "nicepay", order_sheet: input.orderSheet },
-  });
+  const response = await client.storeHttp.post<RawNicepayReady>(
+    `v1.0/order_sheets/${encodeURIComponent(uid)}/payment/ready/`,
+    {
+      body: { pg_type: input.pgType ?? "nicepay", order_sheet: input.orderSheet },
+    },
+  );
   return {
     goodsName: response.goods_name,
     amount: response.amt,

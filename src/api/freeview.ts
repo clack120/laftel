@@ -1,4 +1,4 @@
-import type { Http } from "../http.ts";
+import type { ApiOptions, Http } from "../http.ts";
 
 /** 무료 감상(PC방 등 NC 제휴 IP). start 이후 items/current로 감상 가능 목록과 상태를 조회함 */
 export class FreeView {
@@ -8,8 +8,12 @@ export class FreeView {
     return this.http.get("free_views/v1/current/");
   }
 
-  items(opts: { limit?: number; offset?: number } = {}): Promise<unknown> {
-    return this.http.get("free_views/v1/items/", { query: { limit: opts.limit ?? 24, offset: opts.offset } });
+  items(opts: ApiOptions & { limit?: number; offset?: number } = {}): Promise<unknown> {
+    return this.http.get("free_views/v1/items/", {
+      query: { limit: opts.limit ?? 24, offset: opts.offset },
+      anon: opts.anon,
+      signal: opts.signal,
+    });
   }
 
   recommended(): Promise<{ items?: unknown[] }> {

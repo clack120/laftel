@@ -1,4 +1,4 @@
-import type { Http } from "../http.ts";
+import type { ApiOptions, Http } from "../http.ts";
 import { mapPage } from "../paginate.ts";
 import { Comment } from "../models.ts";
 import { kst } from "../normalize.ts";
@@ -64,25 +64,30 @@ export class Events {
   constructor(private http: Http) {}
 
   async list(
-    opts: { status?: string; offset?: number; limit?: number; banner?: boolean; itemId?: number } = {},
+    opts: ApiOptions & { status?: string; offset?: number; limit?: number; banner?: boolean; itemId?: number } = {},
   ): Promise<Paginated<Event>> {
     const page = await this.http.get<Paginated<RawEvent>>("events/v2/list/", {
       query: { status: opts.status, offset: opts.offset, limit: opts.limit, banner: opts.banner, item_id: opts.itemId },
-      anon: true,
+      anon: opts.anon ?? this.http.anon ?? true,
+      signal: opts.signal,
     });
     return mapPage(page, toEvent);
   }
 
-  async get(id: number): Promise<Event> {
-    return toEvent(await this.http.get<RawEvent>(`events/v2/${id}/`, { anon: true }));
+  async get(id: number, opts: ApiOptions = {}): Promise<Event> {
+    return toEvent(
+      await this.http.get<RawEvent>(`events/v2/${id}/`, { ...opts, anon: opts.anon ?? this.http.anon ?? true }),
+    );
   }
 
   comments(
     id: number,
-    opts: { sort?: EventCommentSort; limit?: number; cursor?: string; mine?: boolean } = {},
+    opts: ApiOptions & { sort?: EventCommentSort; limit?: number; cursor?: string; mine?: boolean } = {},
   ): Promise<Paginated<unknown>> {
     return this.http.get(`events/v2/${id}/comments/`, {
       query: { sorting: opts.sort ?? "latest", limit: opts.limit, cursor: opts.cursor, mine: opts.mine },
+      anon: opts.anon,
+      signal: opts.signal,
     });
   }
 
@@ -93,12 +98,15 @@ export class Events {
     return new Comment(raw);
   }
 
-  themes(): Promise<unknown> {
-    return this.http.get("events/v1/theme/list/", { anon: true });
+  themes(opts: ApiOptions = {}): Promise<unknown> {
+    return this.http.get("events/v1/theme/list/", { ...opts, anon: opts.anon ?? this.http.anon ?? true });
   }
 
-  async draw(id: number): Promise<EventDraw> {
-    const r = await this.http.get<RawEventDraw>(`events/v1/${id}/draw/`, { anon: true });
+  async draw(id: number, opts: ApiOptions = {}): Promise<EventDraw> {
+    const r = await this.http.get<RawEventDraw>(`events/v1/${id}/draw/`, {
+      ...opts,
+      anon: opts.anon ?? this.http.anon ?? true,
+    });
     return {
       id: r.id,
       condition: r.condition,
@@ -161,16 +169,19 @@ export class Events {
     });
   }
 
-  votes(): Promise<unknown> {
-    return this.http.get("events/v1/votes/", { anon: true });
+  votes(opts: ApiOptions = {}): Promise<unknown> {
+    return this.http.get("events/v1/votes/", { ...opts, anon: opts.anon ?? this.http.anon ?? true });
   }
 
-  eventVotes(id: number): Promise<unknown> {
-    return this.http.get(`events/v1/${id}/votes/`, { anon: true });
+  eventVotes(id: number, opts: ApiOptions = {}): Promise<unknown> {
+    return this.http.get(`events/v1/${id}/votes/`, { ...opts, anon: opts.anon ?? this.http.anon ?? true });
   }
 
-  voteResult(id: number, voteEventId: number): Promise<unknown> {
-    return this.http.get(`events/v1/${id}/votes/${voteEventId}/result/`, { anon: true });
+  voteResult(id: number, voteEventId: number, opts: ApiOptions = {}): Promise<unknown> {
+    return this.http.get(`events/v1/${id}/votes/${voteEventId}/result/`, {
+      ...opts,
+      anon: opts.anon ?? this.http.anon ?? true,
+    });
   }
 
   castVote(id: number, voteEventId: number, choice: Record<string, unknown> = {}): Promise<unknown> {

@@ -1,4 +1,4 @@
-import type { Http } from "../http.ts";
+import type { ApiOptions, Http } from "../http.ts";
 import { mapPage } from "../paginate.ts";
 import { Episode, type EpisodeProduct, StreamInfo, toEpisodeProduct } from "../models.ts";
 import { kst } from "../normalize.ts";
@@ -19,16 +19,25 @@ export interface VideoPermission {
 export class Episodes {
   constructor(private http: Http, private readonly defaultDevice: PlaybackDevice = "Web") {}
 
-  async list(itemId: number, opts: { sort?: EpisodeSort; limit?: number } = {}): Promise<Paginated<Episode>> {
+  async list(
+    itemId: number,
+    opts: ApiOptions & { sort?: EpisodeSort; limit?: number } = {},
+  ): Promise<Paginated<Episode>> {
     const page = await this.http.get<Paginated<RawEpisode>>("episodes/v3/list/", {
-      query: { item_id: itemId, ...opts },
-      anon: true,
+      query: { item_id: itemId, sort: opts.sort, limit: opts.limit },
+      anon: opts.anon ?? this.http.anon ?? true,
+      signal: opts.signal,
     });
     return mapPage(page, (r) => new Episode(r));
   }
 
-  async get(episodeId: number): Promise<Episode> {
-    return new Episode(await this.http.get<RawEpisode>(`episodes/v3/${episodeId}/`, { anon: true }));
+  async get(episodeId: number, opts: ApiOptions = {}): Promise<Episode> {
+    return new Episode(
+      await this.http.get<RawEpisode>(`episodes/v3/${episodeId}/`, {
+        anon: opts.anon ?? this.http.anon ?? true,
+        signal: opts.signal,
+      }),
+    );
   }
 
   /** 작품의 이어보기 스트림. 시청이력 없으면 204 -> null. */

@@ -13,6 +13,14 @@ import type {
   RawItemLike,
   RawLiveChannel,
   RawLiveProgram,
+  RawPremiere,
+  RawPremiereChatEvent,
+  RawPremiereChatMessage,
+  RawPremiereChatSeed,
+  RawPremierePlayback,
+  RawPremiereSession,
+  RawPremiereVideo,
+  RawPremiereViewerCount,
   RawProfile,
   RawProfileBrief,
   RawProfileStatistics,
@@ -365,7 +373,7 @@ export class Comment {
   readonly likes: number;
   readonly replyCount?: number;
   readonly spoiler: boolean;
-  readonly liked: boolean;
+  readonly liked?: boolean;
   readonly createdAt: Date | null;
   readonly modifiedAt: Date | null;
   readonly itemId?: number;
@@ -406,7 +414,7 @@ export class Review {
   readonly score: number;
   readonly likes: number;
   readonly spoiler: boolean;
-  readonly liked: boolean;
+  readonly liked?: boolean;
   readonly createdAt: Date | null;
   readonly modifiedAt: Date | null;
   readonly itemId?: number | null;
@@ -501,6 +509,171 @@ export class LiveChannel {
     this.hls = ch?.hls_url;
     this.thumbnail = raw.current_thumbnail;
     this.current = raw.current_program ? new LiveProgram(raw.current_program) : null;
+  }
+}
+
+export class Premiere {
+  readonly id: number;
+  readonly status?: RawPremiere["status"];
+  readonly collectionTitle?: string;
+  readonly itemId?: number;
+  readonly startsAt: Date | null;
+  readonly endsAt: Date | null;
+  readonly chatStartsAt: Date | null;
+  readonly serverTime: Date | null;
+  readonly thumbnail?: string;
+  readonly itemDetailBanner: Record<string, string> | null;
+
+  constructor(readonly raw: RawPremiere) {
+    this.id = raw.id;
+    this.status = raw.status;
+    this.collectionTitle = text(raw.collection_title);
+    this.itemId = raw.item_id;
+    this.startsAt = kst(raw.broadcast_start_datetime);
+    this.endsAt = kst(raw.broadcast_end_datetime);
+    this.chatStartsAt = kst(raw.chat_start_datetime);
+    this.serverTime = kst(raw.server_datetime);
+    this.thumbnail = raw.thumbnail;
+    this.itemDetailBanner = raw.item_detail_banner ?? null;
+  }
+}
+
+export class PremiereVideo {
+  readonly contentId?: string | number | null;
+  readonly dash?: string;
+  readonly hls?: string;
+  readonly widevineToken?: string;
+  readonly fairplayToken?: string;
+  readonly subtitleUrl?: string;
+
+  constructor(readonly raw: RawPremiereVideo) {
+    this.contentId = raw.content_id;
+    this.dash = raw.dash_url ?? undefined;
+    this.hls = raw.hls_url ?? undefined;
+    this.widevineToken = raw.widevine_token ?? undefined;
+    this.fairplayToken = raw.fairplay_token ?? undefined;
+    this.subtitleUrl = raw.subtitle_url ?? undefined;
+  }
+}
+
+export class PremierePlayback {
+  readonly status?: string;
+  readonly serverTime: Date | null;
+  readonly playbackToken?: string;
+  readonly startsAt: Date | null;
+  readonly endsAt: Date | null;
+  readonly prerollSeconds?: number;
+  readonly offsetSeconds?: number;
+  readonly durationSeconds?: number;
+  readonly title?: string;
+  readonly itemId?: number;
+  readonly viewerCount?: number;
+  readonly hasReminder?: boolean | null;
+  readonly preview: PremiereVideo | null;
+  readonly stream: PremiereVideo | null;
+
+  constructor(readonly raw: RawPremierePlayback) {
+    this.status = raw.status;
+    this.serverTime = kst(raw.server_datetime);
+    this.playbackToken = raw.playback_token ?? undefined;
+    this.startsAt = kst(raw.broadcast_start_datetime);
+    this.endsAt = kst(raw.broadcast_end_datetime);
+    this.prerollSeconds = raw.preroll_seconds;
+    this.offsetSeconds = raw.playback_offset_seconds;
+    this.durationSeconds = raw.total_duration_seconds;
+    this.title = raw.playback_title;
+    this.itemId = raw.item_id;
+    this.viewerCount = raw.viewer_count;
+    this.hasReminder = raw.has_reminder;
+    this.preview = raw.preview_streaming_video ? new PremiereVideo(raw.preview_streaming_video) : null;
+    this.stream = raw.streaming_video ? new PremiereVideo(raw.streaming_video) : null;
+  }
+}
+
+export class PremiereViewerCount {
+  readonly viewerCount?: number;
+  readonly serverTime: Date | null;
+
+  constructor(readonly raw: RawPremiereViewerCount) {
+    this.viewerCount = raw.viewer_count;
+    this.serverTime = kst(raw.server_datetime);
+  }
+}
+
+export class PremiereSession {
+  readonly viewerCount?: number;
+  readonly serverTime: Date | null;
+
+  constructor(readonly raw: RawPremiereSession) {
+    this.viewerCount = raw.viewer_count;
+    this.serverTime = kst(raw.server_datetime);
+  }
+}
+
+export class PremiereChatSeed {
+  readonly channel: string;
+  readonly adminChannel: string;
+  readonly endsAt: Date | null;
+  readonly tokenRequest: RawPremiereChatSeed["token_request"];
+
+  constructor(readonly raw: RawPremiereChatSeed) {
+    this.channel = raw.channel_name;
+    this.adminChannel = raw.admin_channel_name;
+    this.endsAt = kst(raw.chat_end_datetime);
+    this.tokenRequest = raw.token_request;
+  }
+}
+
+export class PremiereChatMessage {
+  readonly clientMessageId: string;
+  readonly content: string;
+  readonly profile: { id: number; name: string; rank?: number; continuedMembershipDays?: number | null };
+
+  constructor(readonly raw: RawPremiereChatMessage) {
+    this.clientMessageId = raw.client_message_id;
+    this.content = raw.content;
+    this.profile = {
+      id: raw.profile.id,
+      name: raw.profile.name,
+      rank: raw.profile.profile_rank?.rank,
+      continuedMembershipDays: raw.profile.profile_rank?.continued_membership_days,
+    };
+  }
+}
+
+function record(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function chatMessage(value: unknown): value is RawPremiereChatMessage {
+  return record(value) && typeof value.content === "string" && typeof value.client_message_id === "string" &&
+    record(value.profile) && typeof value.profile.id === "number" && typeof value.profile.name === "string";
+}
+
+/** Decodes Ably live/history payloads. */
+export class PremiereChatEvent {
+  /** Ably message ID, also used by moderation. */
+  readonly id?: string;
+  readonly name?: string;
+  readonly sentAt: Date | null;
+  readonly data: unknown;
+  readonly message: PremiereChatMessage | null;
+
+  constructor(readonly raw: RawPremiereChatEvent) {
+    this.id = raw.id;
+    this.name = raw.name;
+    const stamp = raw.timestamp === undefined ? null : new Date(raw.timestamp);
+    this.sentAt = stamp && !isNaN(stamp.getTime()) ? stamp : null;
+    let data = raw.data;
+    if (typeof data === "string") {
+      try {
+        data = JSON.parse(data);
+      } catch {
+        // Non-JSON data remains opaque.
+      }
+    }
+    this.data = data;
+    this.message = raw.name === "message" && chatMessage(data) ? new PremiereChatMessage(data) : null;
   }
 }
 

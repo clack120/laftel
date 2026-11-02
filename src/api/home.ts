@@ -1,4 +1,4 @@
-import type { Http } from "../http.ts";
+import type { ApiOptions, Http } from "../http.ts";
 import { mapPage } from "../paginate.ts";
 import type { LiteralUnion, Paginated } from "../types.ts";
 import { Item } from "../models.ts";
@@ -55,18 +55,19 @@ export interface Panorama {
 export class Home {
   constructor(private http: Http) {}
 
-  async ranking(window: RankingWindow = "4hour"): Promise<Item[]> {
+  async ranking(window: RankingWindow = "4hour", opts: ApiOptions = {}): Promise<Item[]> {
     const list = await this.http.get<RawItemCard[]>("home/v1/recommend/ranking/", {
       query: { type: window },
-      anon: true,
+      anon: opts.anon ?? this.http.anon ?? true,
+      signal: opts.signal,
     });
     return list.map((r) => new Item(r));
   }
 
-  async rankingByGenre(): Promise<{ genre?: string; statisticsType?: string; items: Item[] }[]> {
+  async rankingByGenre(opts: ApiOptions = {}): Promise<{ genre?: string; statisticsType?: string; items: Item[] }[]> {
     const list = await this.http.get<{ genre?: string; statistics_type?: string; item_list?: RawItemCard[] }[]>(
       "home/v1/recommend/ranking/genre/",
-      { anon: true },
+      { ...opts, anon: opts.anon ?? this.http.anon ?? true },
     );
     return list.map((g) => ({
       genre: g.genre,
@@ -75,12 +76,15 @@ export class Home {
     }));
   }
 
-  special(): Promise<unknown> {
-    return this.http.get("home/v1/recommends/special/", { anon: true });
+  special(opts: ApiOptions = {}): Promise<unknown> {
+    return this.http.get("home/v1/recommends/special/", { ...opts, anon: opts.anon ?? this.http.anon ?? true });
   }
 
-  async carousels(): Promise<Carousel[]> {
-    const list = await this.http.get<RawCarousel[]>("carousels/v2/list/", { anon: true });
+  async carousels(opts: ApiOptions = {}): Promise<Carousel[]> {
+    const list = await this.http.get<RawCarousel[]>("carousels/v2/list/", {
+      ...opts,
+      anon: opts.anon ?? this.http.anon ?? true,
+    });
     return list.map((r) => ({
       id: r.id,
       webImage: r.web_img,
@@ -96,10 +100,13 @@ export class Home {
     }));
   }
 
-  async itemCollections(opts: { limit?: number; seed?: number; offset?: number } = {}): Promise<Paginated<Collection>> {
+  async itemCollections(
+    opts: ApiOptions & { limit?: number; seed?: number; offset?: number } = {},
+  ): Promise<Paginated<Collection>> {
     const page = await this.http.get<Paginated<RawCollection>>("discovery/v1/item_collections/", {
-      query: { ...opts },
-      anon: true,
+      query: { limit: opts.limit, seed: opts.seed, offset: opts.offset },
+      anon: opts.anon ?? this.http.anon ?? true,
+      signal: opts.signal,
     });
     return mapPage(page, (r) => ({
       name: r.name,
@@ -110,14 +117,14 @@ export class Home {
     }));
   }
 
-  async panorama(): Promise<Panorama | null> {
+  async panorama(opts: ApiOptions = {}): Promise<Panorama | null> {
     const r = await this.http.get<
       {
         id: number;
         name: string;
         items: { image: string; item_id: number; rating?: number; external_destination?: string | null }[];
       } | null
-    >("discovery/v1/panorama_collection/", { anon: true });
+    >("discovery/v1/panorama_collection/", { ...opts, anon: opts.anon ?? this.http.anon ?? true });
     if (!r) return null;
     return {
       id: r.id,

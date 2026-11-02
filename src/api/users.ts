@@ -1,4 +1,4 @@
-import type { Http } from "../http.ts";
+import type { ApiOptions, Http } from "../http.ts";
 import { mapPage } from "../paginate.ts";
 import { ContinueWatchingEntry, Item } from "../models.ts";
 import { episodeLabel } from "../normalize.ts";
@@ -38,30 +38,36 @@ export class Users {
 
   async continueWatching(
     userId: number,
-    opts: { limit?: number; offset?: number } = {},
+    opts: ApiOptions & { limit?: number; offset?: number } = {},
   ): Promise<Paginated<ContinueWatchingEntry>> {
     const page = await this.http.get<Paginated<RawContinueWatching>>(`users/v1/${userId}/continue_watching/`, {
-      query: { ...opts },
+      query: { limit: opts.limit, offset: opts.offset },
+      anon: opts.anon,
+      signal: opts.signal,
     });
     return mapPage(page, (r) => new ContinueWatchingEntry(r));
   }
 
   async playHistory(
     userId: number,
-    opts: { sort?: PlayHistorySort; limit?: number; offset?: number } = {},
+    opts: ApiOptions & { sort?: PlayHistorySort; limit?: number; offset?: number } = {},
   ): Promise<Paginated<PlayHistoryEntry>> {
     const page = await this.http.get<Paginated<RawPlayHistoryEntry>>(`users/v2/${userId}/playhistory_set/`, {
       query: { sorting: opts.sort, limit: opts.limit, offset: opts.offset },
+      anon: opts.anon,
+      signal: opts.signal,
     });
     return mapPage(page, toPlayHistory);
   }
 
   purchasedItems(
     userId: number,
-    opts: { sort?: string; limit?: number; offset?: number } = {},
+    opts: ApiOptions & { sort?: string; limit?: number; offset?: number } = {},
   ): Promise<Paginated<unknown>> {
     return this.http.get(`v1.0/users/${userId}/purchased_items/`, {
       query: { sorting: opts.sort, limit: opts.limit, offset: opts.offset },
+      anon: opts.anon,
+      signal: opts.signal,
     });
   }
 

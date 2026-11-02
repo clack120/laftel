@@ -1,4 +1,4 @@
-import type { Http } from "../http.ts";
+import type { ApiOptions, Http } from "../http.ts";
 import { mapPage } from "../paginate.ts";
 import type { Paginated } from "../types.ts";
 import type { RawHomeCollection, RawStoreClassification, RawStoreProduct } from "../raw.ts";
@@ -148,8 +148,11 @@ const toClassification = (r: RawStoreClassification): Classification => ({
 export class StoreHome {
   constructor(private http: Http) {}
 
-  async collections(): Promise<HomeCollection[]> {
-    const list = await this.http.get<RawHomeCollection[]>("v1.0/home/collections/", { anon: true });
+  async collections(opts: ApiOptions = {}): Promise<HomeCollection[]> {
+    const list = await this.http.get<RawHomeCollection[]>("v1.0/home/collections/", {
+      ...opts,
+      anon: opts.anon ?? this.http.anon ?? true,
+    });
     return list.map((r) => ({
       id: r.home_collection_id,
       name: r.name,
@@ -167,10 +170,11 @@ export class StoreHome {
     }));
   }
 
-  async collection(id: number, opts: { limit?: number } = {}): Promise<Paginated<StoreProduct>> {
+  async collection(id: number, opts: ApiOptions & { limit?: number } = {}): Promise<Paginated<StoreProduct>> {
     const page = await this.http.get<Paginated<RawStoreProduct>>(`v1.0/home/collections/${id}/`, {
-      query: { ...opts },
-      anon: true,
+      query: { limit: opts.limit },
+      anon: opts.anon ?? this.http.anon ?? true,
+      signal: opts.signal,
     });
     return mapPage(page, (r) => new StoreProduct(r));
   }
@@ -225,18 +229,29 @@ export class StoreCarts {
 export class StoreWishlists {
   constructor(private http: Http) {}
 
-  async list(opts: { limit?: number } = {}): Promise<Paginated<StoreProduct>> {
-    const page = await this.http.get<Paginated<RawStoreProduct>>("v1.0/wishlists/products/", { query: { ...opts } });
+  async list(opts: ApiOptions & { limit?: number } = {}): Promise<Paginated<StoreProduct>> {
+    const page = await this.http.get<Paginated<RawStoreProduct>>("v1.0/wishlists/products/", {
+      anon: opts.anon,
+      signal: opts.signal,
+      query: { limit: opts.limit },
+    });
     return mapPage(page, (r) => new StoreProduct(r));
   }
 
-  async ids(): Promise<{ productNos: number[]; classificationIds: number[] }> {
-    const r = await this.http.get<{ product_nos?: number[]; classification_ids?: number[] }>("v1.0/wishlists/ids/");
+  async ids(opts: ApiOptions = {}): Promise<{ productNos: number[]; classificationIds: number[] }> {
+    const r = await this.http.get<{ product_nos?: number[]; classification_ids?: number[] }>(
+      "v1.0/wishlists/ids/",
+      opts,
+    );
     return { productNos: r.product_nos ?? [], classificationIds: r.classification_ids ?? [] };
   }
 
-  classifications(opts: { limit?: number } = {}): Promise<unknown> {
-    return this.http.get("v1.0/wishlists/classifications/", { query: { ...opts } });
+  classifications(opts: ApiOptions & { limit?: number } = {}): Promise<unknown> {
+    return this.http.get("v1.0/wishlists/classifications/", {
+      anon: opts.anon,
+      signal: opts.signal,
+      query: { limit: opts.limit },
+    });
   }
 
   add(productNo: number): Promise<unknown> {
@@ -251,25 +266,27 @@ export class StoreWishlists {
 export class StoreOrders {
   constructor(private http: Http) {}
 
-  list(opts: { limit?: number } = {}): Promise<Paginated<unknown>> {
-    return this.http.get("v1.0/orders/", { query: { ...opts } });
+  list(opts: ApiOptions & { limit?: number } = {}): Promise<Paginated<unknown>> {
+    return this.http.get("v1.0/orders/", { anon: opts.anon, signal: opts.signal, query: { limit: opts.limit } });
   }
 }
 
 export class StoreClassifications {
   constructor(private http: Http) {}
 
-  async popular(): Promise<Paginated<Classification>> {
+  async popular(opts: ApiOptions = {}): Promise<Paginated<Classification>> {
     const page = await this.http.get<Paginated<RawStoreClassification>>("v1.0/classifications/popular/", {
-      anon: true,
+      anon: opts.anon ?? this.http.anon ?? true,
+      signal: opts.signal,
     });
     return mapPage(page, toClassification);
   }
 
-  async search(keyword: string, opts: { limit?: number } = {}): Promise<Paginated<Classification>> {
+  async search(keyword: string, opts: ApiOptions & { limit?: number } = {}): Promise<Paginated<Classification>> {
     const page = await this.http.get<Paginated<RawStoreClassification>>("v1.0/classifications/search/", {
-      query: { keyword, ...opts },
-      anon: true,
+      query: { keyword, limit: opts.limit },
+      anon: opts.anon ?? this.http.anon ?? true,
+      signal: opts.signal,
     });
     return mapPage(page, toClassification);
   }
@@ -278,8 +295,12 @@ export class StoreClassifications {
 export class StoreBoards {
   constructor(private http: Http) {}
 
-  inquiry(opts: { limit?: number; offset?: number } = {}): Promise<Paginated<unknown>> {
-    return this.http.get("v1.0/boards/inquiry/", { query: { ...opts } });
+  inquiry(opts: ApiOptions & { limit?: number; offset?: number } = {}): Promise<Paginated<unknown>> {
+    return this.http.get("v1.0/boards/inquiry/", {
+      anon: opts.anon,
+      signal: opts.signal,
+      query: { limit: opts.limit, offset: opts.offset },
+    });
   }
 
   deleteInquiry(articleNo: number): Promise<void> {
@@ -294,8 +315,8 @@ export class StoreBoards {
 export class StoreAccount {
   constructor(private http: Http) {}
 
-  status(): Promise<unknown> {
-    return this.http.get("v1.0/status/", { anon: true });
+  status(opts: ApiOptions = {}): Promise<unknown> {
+    return this.http.get("v1.0/status/", { ...opts, anon: opts.anon ?? this.http.anon ?? true });
   }
 
   checkPermission(): Promise<unknown> {

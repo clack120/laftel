@@ -248,7 +248,7 @@ export interface RawComment {
   modified: string;
   count_like: number;
   count_reply_comment?: number;
-  is_click_like: boolean;
+  is_click_like?: boolean;
   is_spoiler: boolean;
   replies?: RawComment[];
 }
@@ -262,7 +262,7 @@ export interface RawReview {
   created: string | null;
   modified: string | null;
   count_like: number;
-  is_click_like: boolean;
+  is_click_like?: boolean;
   is_spoiler: boolean;
 }
 
@@ -321,7 +321,7 @@ export interface RawContinueWatching {
 export interface RawAuth {
   user: RawAccount;
   key: string;
-  method: LiteralUnion<"email" | "google" | "kakao">;
+  method: LiteralUnion<"email" | "google" | "kakao" | "apple">;
   is_restored: boolean;
   is_registered: boolean;
 }
@@ -405,6 +405,98 @@ export interface RawLiveChannel {
   current_thumbnail?: string;
 }
 
+export interface RawPremiere {
+  id: number;
+  status?: LiteralUnion<"standby" | "running" | "ended">;
+  broadcast_start_datetime?: string;
+  broadcast_end_datetime?: string;
+  chat_start_datetime?: string;
+  server_datetime?: string;
+  collection_title?: string;
+  item_id?: number;
+  thumbnail?: string;
+  item_detail_banner?: Record<string, string> | null;
+  [key: string]: unknown;
+}
+
+export interface RawPremiereVideo {
+  content_id?: string | number | null;
+  dash_url?: string | null;
+  hls_url?: string | null;
+  widevine_token?: string | null;
+  fairplay_token?: string | null;
+  subtitle_url?: string | null;
+  [key: string]: unknown;
+}
+
+export interface RawPremierePlayback {
+  status?: string;
+  server_datetime?: string;
+  playback_token?: string | null;
+  broadcast_start_datetime?: string | null;
+  broadcast_end_datetime?: string | null;
+  preroll_seconds?: number;
+  playback_offset_seconds?: number;
+  total_duration_seconds?: number;
+  playback_title?: string;
+  item_id?: number;
+  viewer_count?: number;
+  has_reminder?: boolean | null;
+  preview_streaming_video?: RawPremiereVideo | null;
+  streaming_video?: RawPremiereVideo | null;
+  [key: string]: unknown;
+}
+
+export interface RawPremiereViewerCount {
+  viewer_count?: number;
+  server_datetime?: string;
+  [key: string]: unknown;
+}
+
+export interface RawPremiereSession extends RawPremiereViewerCount {}
+
+export interface RawPremiereTokenRequest {
+  keyName: string;
+  mac: string;
+  nonce: string;
+  timestamp: number;
+  ttl?: number;
+  capability?: string;
+  clientId?: string;
+  [key: string]: unknown;
+}
+
+export interface RawPremiereChatSeed {
+  channel_name: string;
+  admin_channel_name: string;
+  chat_end_datetime: string;
+  token_request: RawPremiereTokenRequest;
+  [key: string]: unknown;
+}
+
+export interface RawPremiereChatProfile {
+  id: number;
+  name: string;
+  profile_rank?: { rank?: number; continued_membership_days?: number | null; [key: string]: unknown };
+  [key: string]: unknown;
+}
+
+export interface RawPremiereChatMessage {
+  client_message_id: string;
+  content: string;
+  profile: RawPremiereChatProfile;
+  [key: string]: unknown;
+}
+
+export interface RawPremiereChatEvent {
+  id?: string;
+  name?: string;
+  timestamp?: number;
+  data?: unknown;
+  encoding?: string | null;
+  [key: string]: unknown;
+}
+
 export interface RawMembershipProduct {
   id?: number;
   name?: string;
@@ -425,7 +517,7 @@ export interface RawMembership {
   purchase_token?: string;
 }
 
-/** reserved(예약된 다음 결제)는 current와 모양이 다름: status/next_payment_date/billing_info. */
+/** Reserved next payment, distinct from current membership. */
 export interface RawReservedMembership {
   status?: string;
   next_payment_date?: string;

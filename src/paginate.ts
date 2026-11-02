@@ -1,4 +1,4 @@
-import type { Http, RequestOptions } from "./http.ts";
+import type { Http, QueryValue, RequestOptions } from "./http.ts";
 import type { Paginated } from "./types.ts";
 
 export async function* paginate<T>(
@@ -6,13 +6,26 @@ export async function* paginate<T>(
   path: string,
   opts?: RequestOptions,
 ): AsyncGenerator<T, void, unknown> {
-  let page = await http.get<Paginated<T>>(path, opts);
+  const seen = new Set<string>();
+  let options = opts;
   while (true) {
+    const cursor = paginationCursor(http, path, options?.query);
+    if (seen.has(cursor)) throw new Error("Repeated a pagination cursor");
+    seen.add(cursor);
+    const page = await http.get<Paginated<T>>(path, options);
     for (const item of page.results ?? []) yield item;
     const next = page.next;
     if (!next) return;
-    page = await http.get<Paginated<T>>(next, opts && { anon: opts.anon, signal: opts.signal, headers: opts.headers });
+    path = new URL(next, cursor).href;
+    options = opts && { ...opts, query: undefined };
   }
+}
+
+export function paginationCursor(http: Http, path: string, query?: Record<string, QueryValue>): string {
+  const url = new URL(http.resolve(path, query));
+  url.hash = "";
+  url.searchParams.sort();
+  return url.href;
 }
 
 export function mapPage<R, M>(page: Paginated<R>, fn: (r: R) => M): Paginated<M> {

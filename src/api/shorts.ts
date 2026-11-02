@@ -1,12 +1,14 @@
-import type { Http } from "../http.ts";
+import type { ApiOptions, Http, RequestOptions } from "../http.ts";
+import { LaftelError } from "../errors.ts";
 import { kst, text } from "../normalize.ts";
-import { mapPage } from "../paginate.ts";
+import { mapPage, paginationCursor } from "../paginate.ts";
 import type { Paginated } from "../types.ts";
 
 export interface RawShortCreator {
   id: number;
   name: string;
   profile_image: string;
+  follower_count?: number;
 }
 
 export interface RawShortLinkedItem {
@@ -53,6 +55,7 @@ export interface ShortCreator {
   id: number;
   name: string;
   profileImage: string;
+  followerCount?: number;
 }
 
 export interface ShortLinkedItem {
@@ -112,7 +115,12 @@ export class Short {
     this.runningTime = raw.running_time;
     this.adult = raw.is_adult;
     this.createdAt = kst(raw.created);
-    this.creator = { id: raw.creator.id, name: raw.creator.name, profileImage: raw.creator.profile_image };
+    this.creator = {
+      id: raw.creator.id,
+      name: raw.creator.name,
+      profileImage: raw.creator.profile_image,
+      followerCount: raw.creator.follower_count,
+    };
     this.tags = raw.tags ?? [];
     this.linkedItems = (raw.linked_items ?? []).map((item) => ({
       id: item.id,
@@ -145,18 +153,20 @@ export interface ShortCollection {
   results: ShortCard[];
 }
 
-export interface ShortFeedOptions {
+export type ShortRequestOptions = ApiOptions;
+
+export interface ShortFeedOptions extends ShortRequestOptions {
   limit?: number;
   afterShortsId?: number;
   anchorShortsId?: number;
 }
 
-export interface ShortPageOptions {
+export interface ShortPageOptions extends ShortRequestOptions {
   limit?: number;
   offset?: number;
 }
 
-export interface BookmarkedShortsOptions {
+export interface BookmarkedShortsOptions extends ShortRequestOptions {
   limit?: number;
   startShortsId?: number;
   offset?: number;
@@ -173,6 +183,12 @@ export interface ShortPlaybackEnd {
   maxPositionSeconds: number;
 }
 
+const feedQuery = (opts: ShortFeedOptions) => ({
+  limit: opts.limit,
+  after_shorts_id: opts.afterShortsId,
+  anchor_shorts_id: opts.anchorShortsId,
+});
+
 const mapFeed = (page: { next: string | null; results?: RawShort[] }): ShortFeedPage => ({
   next: page.next,
   results: (page.results ?? []).map((raw) => new Short(raw)),
@@ -181,38 +197,63 @@ const mapFeed = (page: { next: string | null; results?: RawShort[] }): ShortFeed
 export class Shorts {
   constructor(private http: Http) {}
 
+  private async read<T>(path: string, opts: RequestOptions = {}): Promise<T> {
+    try {
+      return await this.http.get<T>(path, { ...opts, anon: opts.anon ?? this.http.anon ?? true });
+    } catch (error) {
+      if (
+        opts.anon !== undefined || this.http.anon !== undefined || !(error instanceof LaftelError) ||
+        error.status !== 401 || !this.http.session.token
+      ) {
+        throw error;
+      }
+      return this.http.get<T>(path, { ...opts, anon: false });
+    }
+  }
+
   async feed(opts: ShortFeedOptions = {}): Promise<ShortFeedPage> {
-    const page = await this.http.get<{ next: string | null; results?: RawShort[] }>("shorts/v1/feed/", {
-      query: {
-        limit: opts.limit,
-        after_shorts_id: opts.afterShortsId,
-        anchor_shorts_id: opts.anchorShortsId,
-      },
+    const page = await this.read<{ next: string | null; results?: RawShort[] }>("shorts/v1/feed/", {
+      query: feedQuery(opts),
+      anon: opts.anon,
+      signal: opts.signal,
     });
     return mapFeed(page);
   }
 
   async *allFeed(opts: ShortFeedOptions = {}): AsyncGenerator<Short, void, unknown> {
     let page = await this.feed(opts);
+    let cursor = paginationCursor(this.http, "shorts/v1/feed/", feedQuery(opts));
+    const seen = new Set([cursor]);
     while (true) {
       for (const short of page.results) yield short;
       if (!page.next) return;
-      page = mapFeed(await this.http.get<{ next: string | null; results?: RawShort[] }>(page.next));
+      cursor = paginationCursor(this.http, new URL(page.next, cursor).href);
+      if (seen.has(cursor)) throw new Error("shorts feed repeated a pagination cursor");
+      seen.add(cursor);
+      page = mapFeed(
+        await this.read<{ next: string | null; results?: RawShort[] }>(cursor, {
+          anon: opts.anon,
+          signal: opts.signal,
+        }),
+      );
     }
   }
 
-  async get(shortsId: number): Promise<Short> {
-    return new Short(await this.http.get<RawShort>(`shorts/v1/${shortsId}/`));
+  /** Detail likes/comments can be zero even when feed counts are nonzero. */
+  async get(shortsId: number, opts: ShortRequestOptions = {}): Promise<Short> {
+    return new Short(await this.read<RawShort>(`shorts/v1/${shortsId}/`, opts));
   }
 
-  async related(shortsId: number): Promise<Short[]> {
-    const response = await this.http.get<{ results?: RawShort[] }>(`shorts/v1/${shortsId}/related/`);
+  async related(shortsId: number, opts: ShortRequestOptions = {}): Promise<Short[]> {
+    const response = await this.read<{ results?: RawShort[] }>(`shorts/v1/${shortsId}/related/`, opts);
     return (response.results ?? []).map((raw) => new Short(raw));
   }
 
   async forItem(itemId: number, opts: ShortPageOptions = {}): Promise<Paginated<Short>> {
-    const page = await this.http.get<Paginated<RawShort>>(`shorts/v1/items/${itemId}/shorts/`, {
+    const page = await this.read<Paginated<RawShort>>(`shorts/v1/items/${itemId}/shorts/`, {
       query: { limit: opts.limit, offset: opts.offset },
+      anon: opts.anon,
+      signal: opts.signal,
     });
     return mapPage(page, (raw) => new Short(raw));
   }
@@ -220,19 +261,25 @@ export class Shorts {
   async bookmarks(opts: BookmarkedShortsOptions = {}): Promise<Paginated<Short>> {
     const page = await this.http.get<Paginated<RawShort>>("shorts/v1/bookmarks/", {
       query: { limit: opts.limit, start_shorts_id: opts.startShortsId, offset: opts.offset },
+      anon: opts.anon,
+      signal: opts.signal,
     });
     return mapPage(page, (raw) => new Short(raw));
   }
 
-  async collections(opts: { limit?: number } = {}): Promise<ShortCard[]> {
-    const rows = await this.http.get<RawShortCard[]>("shorts/v1/collections/", { query: { limit: opts.limit } });
+  async collections(opts: ShortRequestOptions & { limit?: number } = {}): Promise<ShortCard[]> {
+    const rows = await this.read<RawShortCard[]>("shorts/v1/collections/", {
+      query: { limit: opts.limit },
+      anon: opts.anon,
+      signal: opts.signal,
+    });
     return rows.map((raw) => new ShortCard(raw));
   }
 
-  async collectionsV2(opts: { limit?: number } = {}): Promise<ShortCollection> {
-    const collection = await this.http.get<{ placement: string; results?: RawShortCard[] }>(
+  async collectionsV2(opts: ShortRequestOptions & { limit?: number } = {}): Promise<ShortCollection> {
+    const collection = await this.read<{ placement: string; results?: RawShortCard[] }>(
       "shorts/v2/collections/",
-      { query: { limit: opts.limit } },
+      { query: { limit: opts.limit }, anon: opts.anon, signal: opts.signal },
     );
     return {
       placement: collection.placement,

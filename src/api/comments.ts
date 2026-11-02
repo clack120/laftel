@@ -1,4 +1,4 @@
-import type { Http } from "../http.ts";
+import type { ApiOptions, Http } from "../http.ts";
 import { mapPage } from "../paginate.ts";
 import { Comment } from "../models.ts";
 import type { LiteralUnion, Paginated } from "../types.ts";
@@ -6,7 +6,7 @@ import type { RawComment } from "../raw.ts";
 
 export type CommentSort = LiteralUnion<"top" | "newest" | "like">;
 
-export interface CommentListOptions {
+export interface CommentListOptions extends ApiOptions {
   episodeId?: number;
   shortsId?: number;
   parentCommentId?: number;
@@ -38,30 +38,37 @@ export class Comments {
         mine: opts.mine,
         with_replies: opts.withReplies,
       },
+      anon: opts.anon,
+      signal: opts.signal,
     });
     return mapPage(page, (r) => new Comment(r));
   }
 
-  async count(episodeId: number): Promise<number> {
+  async count(episodeId: number, opts: ApiOptions = {}): Promise<number> {
     const res = await this.http.get<{ comment_count: number }>("comments/v1/count/", {
       query: { episode_id: episodeId },
+      anon: opts.anon,
+      signal: opts.signal,
     });
     return res.comment_count;
   }
 
-  async countShorts(shortsId: number): Promise<number> {
+  async countShorts(shortsId: number, opts: ApiOptions = {}): Promise<number> {
     const res = await this.http.get<{ comment_count: number }>("comments/v1/count/", {
       query: { shorts_id: shortsId },
+      anon: opts.anon,
+      signal: opts.signal,
     });
     return res.comment_count;
   }
 
-  async get(id: number): Promise<Comment> {
-    return new Comment(await this.http.get<RawComment>(`comments/v1/${id}/`));
+  async get(id: number, opts: ApiOptions = {}): Promise<Comment> {
+    return new Comment(await this.http.get<RawComment>(`comments/v1/${id}/`, opts));
   }
 
-  create(input: CommentCreateInput): Promise<{ id: number }> {
+  create(input: CommentCreateInput, opts: ApiOptions = {}): Promise<{ id: number }> {
     return this.http.post("comments/v1/list/", {
+      ...opts,
       body: {
         episode: input.episode,
         shorts: input.shorts,
@@ -72,33 +79,34 @@ export class Comments {
     });
   }
 
-  update(id: number, input: { content: string; spoiler?: boolean }): Promise<void> {
+  update(id: number, input: { content?: string; spoiler?: boolean }, opts: ApiOptions = {}): Promise<void> {
     return this.http.patch(`comments/v1/${id}/`, {
-      body: { content: input.content, is_spoiler: input.spoiler ?? false },
+      ...opts,
+      body: { content: input.content, is_spoiler: input.spoiler },
     });
   }
 
-  delete(id: number): Promise<void> {
-    return this.http.del(`comments/v1/${id}/`);
+  delete(id: number, opts: ApiOptions = {}): Promise<void> {
+    return this.http.del(`comments/v1/${id}/`, opts);
   }
 
-  deleteMany(ids: number[]): Promise<void> {
-    return this.http.post("comments/v1/delete/", { body: { ids } });
+  deleteMany(ids: number[], opts: ApiOptions = {}): Promise<void> {
+    return this.http.post("comments/v1/delete/", { ...opts, body: { ids } });
   }
 
-  like(id: number): Promise<void> {
-    return this.http.patch(`comments/v1/${id}/like/`, { body: { is_active: true } });
+  like(id: number, opts: ApiOptions = {}): Promise<void> {
+    return this.http.patch(`comments/v1/${id}/like/`, { ...opts, body: { is_active: true } });
   }
 
-  unlike(id: number): Promise<void> {
-    return this.http.patch(`comments/v1/${id}/like/`, { body: { is_active: false } });
+  unlike(id: number, opts: ApiOptions = {}): Promise<void> {
+    return this.http.patch(`comments/v1/${id}/like/`, { ...opts, body: { is_active: false } });
   }
 
-  reportSpoiler(id: number): Promise<void> {
-    return this.http.post(`comments/v1/${id}/report/`, { body: { is_spoiler: true } });
+  reportSpoiler(id: number, opts: ApiOptions = {}): Promise<void> {
+    return this.http.post(`comments/v1/${id}/report/`, { ...opts, body: { is_spoiler: true } });
   }
 
-  reportAbuse(id: number): Promise<void> {
-    return this.http.post(`comments/v1/${id}/report/`, { body: { is_spoiler: false } });
+  reportAbuse(id: number, opts: ApiOptions = {}): Promise<void> {
+    return this.http.post(`comments/v1/${id}/report/`, { ...opts, body: { is_spoiler: false } });
   }
 }
