@@ -93,7 +93,7 @@ export class Memberships {
     return res.products.map(toMembershipProduct);
   }
 
-  /** Legacy v2 product selection; listing does not imply purchase eligibility. */
+  /** Membership-product v2 selection; listing does not imply purchase eligibility. */
   async productsV2(opts: ApiOptions = {}): Promise<MembershipProduct[]> {
     const res = await this.http.get<{ products: RawMembershipProduct[] }>("products/v2/membership_products/", {
       ...opts,

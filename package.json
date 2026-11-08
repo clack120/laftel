@@ -1,7 +1,7 @@
 {
   "name": "@clack120/laftel",
   "description": "비공식 라프텔 TypeScript SDK",
-  "version": "0.3.0",
+  "version": "0.3.2",
   "type": "module",
   "repository": {
     "type": "git",

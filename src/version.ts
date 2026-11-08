@@ -1,5 +1,5 @@
 export const NAME = "@clack120/laftel";
-export const VERSION = "0.3.0";
+export const VERSION = "0.3.2";
 
 const embeddedRevision = "__LAFTEL_GIT_REVISION__";
 const revision: RegExpExecArray | null = /^([0-9a-f]{7,40})(\.dirty)?$/i.exec(embeddedRevision);

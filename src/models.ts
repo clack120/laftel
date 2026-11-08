@@ -11,6 +11,7 @@ import type {
   RawItem,
   RawItemCard,
   RawItemLike,
+  RawItemV1,
   RawLiveChannel,
   RawLiveProgram,
   RawPremiere,
@@ -194,7 +195,7 @@ export class Item<R extends RawItemLike = RawItemLike> {
   readonly uid?: string;
   readonly name?: string;
   readonly description?: string;
-  /** Source-specific genres; v2 and v4 can return different lists for the same item. */
+  /** Genres from this response; detail contracts can disagree. */
   readonly genres?: string[];
   readonly tags?: string[];
   readonly format?: Medium;
@@ -209,11 +210,11 @@ export class Item<R extends RawItemLike = RawItemLike> {
   readonly releaseWeekdays?: string[];
   /** undefined: omitted; null: no usable date; a Date is converted from KST. */
   readonly latestEpisodeAt: Date | null | undefined;
-  /** undefined: omitted by this endpoint; []: an explicitly empty credits list. */
+  /** undefined: omitted by this response; []: an explicitly empty credits list. */
   readonly directors?: string[];
-  /** undefined: omitted by this endpoint; []: an explicitly empty credits list. */
+  /** undefined: omitted by this response; []: an explicitly empty credits list. */
   readonly cast?: CastMember[];
-  /** undefined: omitted by this endpoint; production/distributor is not a studio. */
+  /** undefined: omitted by this response; production/distributor is not a studio. */
   readonly studios?: string[];
   readonly highlightVideo: HighlightVideo | null | undefined;
   // 플래그는 카드 응답이 생략할 수 있음
@@ -282,7 +283,29 @@ export class Item<R extends RawItemLike = RawItemLike> {
     this.hasEpisodes = r.is_episode_existed;
     this.newRelease = r.is_new_release;
     this.upcoming = r.is_upcoming_release;
-    this.viewable = r.is_viewing ?? r.is_viewable;
+    this.viewable = r.is_viewing ?? r.is_viewable ?? r.viewable;
+  }
+}
+
+/** Catalog-detail projection retaining the nested source documents. */
+export class CatalogItem extends Item<RawItemV1> {
+  get type(): string | undefined {
+    return this.raw.type;
+  }
+  get animation(): RawItemV1["animation_info"] {
+    return this.raw.animation_info;
+  }
+  get metadata(): RawItemV1["meta_info"] {
+    return this.raw.meta_info;
+  }
+  get comics(): RawItemV1["comics_info"] {
+    return this.raw.comics_info;
+  }
+  get lightNovel(): RawItemV1["lightnovel_info"] {
+    return this.raw.lightnovel_info;
+  }
+  get webtoon(): RawItemV1["webtoon_info"] {
+    return this.raw.webtoon_info;
   }
 }
 

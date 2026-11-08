@@ -1,6 +1,6 @@
 import type { ApiOptions, Http } from "../http.ts";
 import { mapPage } from "../paginate.ts";
-import { Item } from "../models.ts";
+import { CatalogItem, Item } from "../models.ts";
 import { kst } from "../normalize.ts";
 import type { LiteralUnion, Paginated } from "../types.ts";
 import type {
@@ -9,7 +9,9 @@ import type {
   RawItemRequest,
   RawItemStatistics,
   RawItemUserState,
+  RawItemV1,
   RawItemV2,
+  RawItemV3,
   RawPlayHistoryEntry,
 } from "../raw.ts";
 import { type PlayHistoryEntry, toPlayHistory } from "./users.ts";
@@ -78,7 +80,17 @@ const toItemRequest = (r: RawItemRequest): ItemRequest => ({
 export class Items {
   constructor(private http: Http) {}
 
-  /** Full v4 detail, including credits, UID and release dates. */
+  /** Catalog-detail v1 contract with nested animation, metadata and publishing documents. */
+  async getV1(id: number, opts: ApiOptions = {}): Promise<CatalogItem> {
+    return new CatalogItem(
+      await this.http.get<RawItemV1>(`items/v1/${id}/`, {
+        anon: opts.anon ?? this.http.anon ?? true,
+        signal: opts.signal,
+      }),
+    );
+  }
+
+  /** Item-detail v4 contract; fields can change independently of other detail contracts. */
   async get(id: number, opts: ApiOptions = {}): Promise<Item<RawItem>> {
     return new Item(
       await this.http.get<RawItem>(`items/v4/${id}/`, {
@@ -88,10 +100,20 @@ export class Items {
     );
   }
 
-  /** Legacy v2 detail; omits credits, UID and release flags, and can differ from get() in other fields. */
+  /** Item-detail v2 contract; inspect raw when choosing a source for a field. */
   async getV2(id: number, opts: ApiOptions = {}): Promise<Item<RawItemV2>> {
     return new Item(
       await this.http.get<RawItemV2>(`items/v2/${id}/`, {
+        anon: opts.anon ?? this.http.anon ?? true,
+        signal: opts.signal,
+      }),
+    );
+  }
+
+  /** Item-detail v3 contract; it does not substitute for another detail contract. */
+  async getV3(id: number, opts: ApiOptions = {}): Promise<Item<RawItemV3>> {
+    return new Item(
+      await this.http.get<RawItemV3>(`items/v3/${id}/`, {
         anon: opts.anon ?? this.http.anon ?? true,
         signal: opts.signal,
       }),

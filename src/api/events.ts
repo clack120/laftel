@@ -13,7 +13,7 @@ export interface Event {
   name?: string;
   type?: string;
   image?: string;
-  bannerImage?: string;
+  bannerImage?: string | null;
   ageRating?: number;
   status?: string;
   startsAt: Date | null;

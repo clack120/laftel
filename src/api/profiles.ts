@@ -131,9 +131,13 @@ export class Profiles {
     return this.http.post(`profiles/v1/${id}/password/`, { body: { password } });
   }
 
-  /** Flat v1 avatar page; category membership is only returned by avatarCategories(). */
-  avatars(opts: ApiOptions = {}): Promise<Paginated<Avatar>> {
-    return this.http.get("profiles/v1/images/", { ...opts, anon: opts.anon ?? this.http.anon ?? true });
+  /** Avatar-page v1 contract; avatarCategories() exposes a category-grouped response. */
+  avatars(opts: ApiOptions & { limit?: number; offset?: number } = {}): Promise<Paginated<Avatar>> {
+    return this.http.get("profiles/v1/images/", {
+      query: { limit: opts.limit, offset: opts.offset },
+      anon: opts.anon ?? this.http.anon ?? true,
+      signal: opts.signal,
+    });
   }
 
   /** Grouped v2 avatars; its envelope is not the v1 paginated shape. */

@@ -87,7 +87,7 @@ export class Premieres {
     opts: PremiereRequestOptions = {},
   ): Promise<PremiereSession | null> {
     if (
-      typeof playbackToken !== "string" || !playbackToken || /\s|[\u0000-\u001f\u007f]/u.test(playbackToken) ||
+      typeof playbackToken !== "string" || !playbackToken || /\s|\p{Cc}/u.test(playbackToken) ||
       playbackToken === "." || playbackToken === ".."
     ) throw new TypeError("a valid premiere playback token is required");
     if (!["playing", "paused", "stopped"].includes(status)) throw new TypeError("invalid premiere playback status");

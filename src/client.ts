@@ -23,6 +23,7 @@ import { FreeView } from "./api/freeview.ts";
 import { Playback } from "./api/playback.ts";
 import { Shorts } from "./api/shorts.ts";
 import { Store } from "./store/index.ts";
+import { bindContracts, type Contracts } from "./contracts.ts";
 
 export const API_BASE = "https://api.laftel.net/api/";
 export const STORE_BASE = "https://store-api.laftel.net/";
@@ -79,6 +80,7 @@ export class Laftel {
   readonly api: Http;
   readonly storeHttp: Http;
   private readonly session: Session;
+  private contractBindings?: Contracts;
 
   readonly items: Items;
   readonly episodes: Episodes;
@@ -133,6 +135,11 @@ export class Laftel {
     this.playback = new Playback(this.api);
     this.shorts = new Shorts(this.api);
     this.store = new Store(this.storeHttp);
+  }
+
+  /** Named raw contracts; availability and response fields depend on the server at request time. */
+  get contracts(): Contracts {
+    return this.contractBindings ??= bindContracts(this.api, this.storeHttp);
   }
 
   get token(): string | null {

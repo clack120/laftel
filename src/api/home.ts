@@ -172,7 +172,7 @@ export class Home {
     });
   }
 
-  /** Legacy v1 raw summaries; the image shape differs from themeSummaries() v2. */
+  /** Theme-summary v1 contract; image fields depend on the source response. */
   themeSummariesV1(opts: ApiOptions & { limit?: number; offset?: number } = {}): Promise<Paginated<ThemeSummaryV1>> {
     return this.http.get("recommends/v1/themes_summary/", {
       query: { limit: opts.limit, offset: opts.offset },
@@ -181,7 +181,7 @@ export class Home {
     });
   }
 
-  /** v2 theme detail includes richer item metadata than themeV1(). */
+  /** Theme-detail v2 contract; item fields depend on the source response. */
   async theme(id: number, opts: ApiOptions = {}): Promise<Theme> {
     return toTheme(
       await this.http.get<RawTheme>(`recommends/v2/themes/${id}/`, {
@@ -191,7 +191,7 @@ export class Home {
     );
   }
 
-  /** Legacy v1 detail contains item cards without v2 credits or release metadata. */
+  /** Theme-detail v1 contract; its item projection is independent of theme(). */
   async themeV1(id: number, opts: ApiOptions = {}): Promise<Theme> {
     return toTheme(
       await this.http.get<RawTheme>(`recommends/v1/themes/${id}/`, {

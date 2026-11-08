@@ -8,6 +8,7 @@ export * from "./version.ts";
 export * from "./paginate.ts";
 export * from "./models.ts";
 export * from "./raw.ts";
+export * from "./contracts.ts";
 
 export * from "./api/items.ts";
 export * from "./api/episodes.ts";

@@ -66,7 +66,7 @@ export interface RawProfileBrief {
 
 export interface RawItem {
   id: number;
-  uid: string;
+  uid?: string;
   name: string;
   content: string | null;
   description: string | null;
@@ -147,6 +147,7 @@ export interface RawItemCard {
   is_dubbed?: boolean;
   is_viewing?: boolean;
   is_viewable?: boolean;
+  viewable?: boolean;
   is_laftel_only?: boolean;
   is_laftel_original?: boolean;
   is_exclusive?: boolean;
@@ -156,7 +157,47 @@ export interface RawItemCard {
   is_expired?: boolean;
 }
 
-/** Legacy v2 detail; credits, UID and release flags are absent, unlike v4. */
+/** Nested catalog data observed in item-detail v1 and v1.0 responses. */
+export interface RawItemV1 extends RawItemCard {
+  type?: string;
+  content?: string | null;
+  awards?: unknown[];
+  avg_rating?: number;
+  is_svod?: boolean;
+  resolution?: unknown;
+  tags?: Tag[];
+  animation_info?: RawItemCard["animation_info"] & {
+    id?: number;
+    production?: { id?: number; name: string; img?: string } | null;
+    original_writer?: unknown[];
+    scenario_writer?: unknown[];
+    staff?: unknown[];
+    created?: string;
+    modified?: string;
+    season?: string;
+    cours?: string;
+    original_air_time?: string | null;
+    distributed_air_time?: string;
+    original_station?: string;
+    distributed_station?: string;
+    item?: number;
+    related_dubbed_item?: number | null;
+    audio_language?: number;
+    subtitle_language?: number;
+    [key: string]: unknown;
+  };
+  meta_info?: Record<string, unknown>;
+  illustrators?: unknown[];
+  author_item?: unknown;
+  comics_info?: Record<string, unknown>;
+  lightnovel_info?: Record<string, unknown>;
+  webtoon_info?: Record<string, unknown>;
+  related_item?: unknown;
+  series_item?: unknown;
+  [key: string]: unknown;
+}
+
+/** Observed item-detail v2 fields; omission is response-specific. */
 export interface RawItemV2 extends RawItemCard {
   content?: string | null;
   notice?: string;
@@ -176,7 +217,13 @@ export interface RawItemV2 extends RawItemCard {
   is_hate?: boolean;
 }
 
-export type RawItemLike = RawItem | RawItemV2 | RawItemCard;
+/** Observed item-detail v3 shape; shared fields do not imply contract equivalence. */
+export interface RawItemV3 extends RawItem {
+  rating?: number | RawRating;
+  rating_type?: RatingType | null;
+}
+
+export type RawItemLike = RawItem | RawItemV1 | RawItemV2 | RawItemV3 | RawItemCard;
 
 export interface RawItemUserState {
   continue_episode_id: number | null;
@@ -444,7 +491,7 @@ export interface RawEvent {
   name?: string;
   type?: string;
   img?: string;
-  banner_img?: string;
+  banner_img?: string | null;
   start_datetime?: string;
   end_datetime?: string;
   rating?: number;
@@ -618,7 +665,7 @@ export interface RawBillingInfo {
 }
 
 export interface RawStoreProduct {
-  /** Legacy v1 search uses thumbnail, whereas v2 uses thumbnail_url. */
+  /** Thumbnail field observed in the product-search v1 response. */
   thumbnail?: string;
   product_id: number;
   product_no: number;

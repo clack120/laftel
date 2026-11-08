@@ -142,7 +142,7 @@ export class StoreProducts {
     return this.list({ ...opts, ottItemUid });
   }
 
-  /** Legacy item-linked products, selected by Item.uid. */
+  /** Item-linked product selection by Item.uid. */
   itemRelated(ottItemUid: string, opts: StoreProductRequestOptions = {}): Promise<unknown> {
     if (typeof ottItemUid !== "string" || !ottItemUid.trim()) throw new TypeError("item UID must not be empty");
     return this.http.get("v1.0/products/item_related/", {
@@ -162,7 +162,7 @@ export class StoreProducts {
     });
   }
 
-  /** v2 paginated search; richer images/classification than legacy searchV1(). */
+  /** Product-search v2 contract with a pagination envelope. */
   async search(
     keyword: string,
     opts: ApiOptions & { sort?: StoreSort; offset?: number; limit?: number } = {},
@@ -175,7 +175,7 @@ export class StoreProducts {
     return mapPage(page, (r) => new StoreProduct(r));
   }
 
-  /** Legacy array response; use search() for paginated results. */
+  /** Product-search v1 contract with an array response. */
   async searchV1(keyword: string, opts: ApiOptions = {}): Promise<StoreProduct[]> {
     const rows = await this.http.get<RawStoreProduct[]>("v1.0/products/search/", {
       query: { keyword },
